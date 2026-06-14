@@ -523,17 +523,6 @@ if ('serviceWorker' in navigator) {
 </script>
 
 
-<footer style="
-  text-align: center;
-  padding: 18px 20px;
-  font-size: 0.78rem;
-  color: rgba(255,255,255,0.35);
-  background: #0F1117;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  letter-spacing: 0.03em;
-">
-  &copy; 2026 <strong style="color:rgba(255,255,255,0.55)">SOH TANKOU JOËL VALDO</strong> &mdash; Tous droits réservés. LearnUp est une création originale protégée.
-</footer>
 
 </body>
 </html>
