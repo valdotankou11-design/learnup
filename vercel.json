@@ -1,26 +1,27 @@
 {
   "version": 2,
   "functions": {
-    "api/index.php":      { "runtime": "vercel-php@0.7.2" },
-    "api/admin.php":      { "runtime": "vercel-php@0.7.2" },
-    "api/extra.php":      { "runtime": "vercel-php@0.7.2" },
-    "dashboard/admin.php":      { "runtime": "vercel-php@0.7.2" },
-    "dashboard/enseignant.php": { "runtime": "vercel-php@0.7.2" },
-    "dashboard/etudiant.php":   { "runtime": "vercel-php@0.7.2" },
-    "dashboard/promoteur.php":  { "runtime": "vercel-php@0.7.2" },
-    "certificat.php":     { "runtime": "vercel-php@0.7.2" },
-    "index.php":          { "runtime": "vercel-php@0.7.2" }
+    "index.php":                      { "runtime": "vercel-php@0.7.2" },
+    "api/index.php":                  { "runtime": "vercel-php@0.7.2" },
+    "api/admin.php":                  { "runtime": "vercel-php@0.7.2" },
+    "api/extra.php":                  { "runtime": "vercel-php@0.7.2" },
+    "api/certificat.php":             { "runtime": "vercel-php@0.7.2" },
+    "api/dashboard/admin.php":        { "runtime": "vercel-php@0.7.2" },
+    "api/dashboard/enseignant.php":   { "runtime": "vercel-php@0.7.2" },
+    "api/dashboard/etudiant.php":     { "runtime": "vercel-php@0.7.2" },
+    "api/dashboard/promoteur.php":    { "runtime": "vercel-php@0.7.2" }
   },
   "routes": [
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/uploads/(.*)", "dest": "/uploads/$1" },
     { "src": "/api/admin(.*)", "dest": "/api/admin.php" },
+    { "src": "/api/extra(.*)", "dest": "/api/extra.php" },
     { "src": "/api/(.*)", "dest": "/api/index.php" },
-    { "src": "/dashboard/admin(.*)", "dest": "/dashboard/admin.php" },
-    { "src": "/dashboard/enseignant(.*)", "dest": "/dashboard/enseignant.php" },
-    { "src": "/dashboard/etudiant(.*)", "dest": "/dashboard/etudiant.php" },
-    { "src": "/dashboard/promoteur(.*)", "dest": "/dashboard/promoteur.php" },
-    { "src": "/certificat(.*)", "dest": "/certificat.php" },
+    { "src": "/dashboard/admin(.*)", "dest": "/api/dashboard/admin.php" },
+    { "src": "/dashboard/enseignant(.*)", "dest": "/api/dashboard/enseignant.php" },
+    { "src": "/dashboard/etudiant(.*)", "dest": "/api/dashboard/etudiant.php" },
+    { "src": "/dashboard/promoteur(.*)", "dest": "/api/dashboard/promoteur.php" },
+    { "src": "/certificat(.*)", "dest": "/api/certificat.php" },
     { "src": "/(.*)", "dest": "/index.php" }
   ]
 }
