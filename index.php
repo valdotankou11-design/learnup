@@ -22,6 +22,11 @@ $onglet  = $_GET['onglet'] ?? 'connexion';
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LearnUp — Apprendre sans limites</title>
   <link rel="stylesheet" href="/assets/css/style.css"/>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="theme-color" content="#6C63FF"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="apple-touch-icon" href="/assets/img/icon-192.png"/>
   <style>
     body {
       display: flex;
@@ -315,7 +320,10 @@ $onglet  = $_GET['onglet'] ?? 'connexion';
       </div>
       <div class="form-group">
         <label class="form-label">Mot de passe</label>
-        <input type="password" name="mot_de_passe" class="form-control" placeholder="••••••••" required/>
+        <div class="input-password-wrap">
+          <input type="password" name="mot_de_passe" id="mdp-login" class="form-control" placeholder="••••••••" required/>
+          <button type="button" class="btn-eye" onclick="toggleMdp('mdp-login',this)" tabindex="-1">👁</button>
+        </div>
       </div>
       <button type="submit" class="btn btn-primary btn-full btn-lg" id="btn-login">
         Se connecter
@@ -364,7 +372,10 @@ $onglet  = $_GET['onglet'] ?? 'connexion';
       </div>
       <div class="form-group">
         <label class="form-label">Mot de passe</label>
-        <input type="password" name="mot_de_passe" class="form-control" placeholder="Min. 8 caractères" minlength="8" required/>
+        <div class="input-password-wrap">
+          <input type="password" name="mot_de_passe" id="mdp-register" class="form-control" placeholder="Min. 8 caractères" minlength="8" required/>
+          <button type="button" class="btn-eye" onclick="toggleMdp('mdp-register',this)" tabindex="-1">👁</button>
+        </div>
       </div>
 
       <button type="submit" class="btn btn-primary btn-full btn-lg" id="btn-register">
@@ -447,5 +458,64 @@ async function sInscrire(e) {
   }
 }
 </script>
+
+<style>
+.input-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-password-wrap .form-control {
+  padding-right: 44px;
+  width: 100%;
+}
+.btn-eye {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.btn-eye:hover { opacity: 1; }
+</style>
+<script>
+function toggleMdp(id, btn) {
+  const input = document.getElementById(id);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('SW enregistré', reg))
+      .catch(err => console.log('SW erreur', err));
+  });
+}
+</script>
+
+
+<footer style="
+  text-align: center;
+  padding: 18px 20px;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.35);
+  background: #0F1117;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  letter-spacing: 0.03em;
+">
+  &copy; 2026 <strong style="color:rgba(255,255,255,0.55)">SOH TANKOU JOËL VALDO</strong> &mdash; Tous droits réservés. LearnUp est une création originale protégée.
+</footer>
+
 </body>
 </html>
