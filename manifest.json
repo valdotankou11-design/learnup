@@ -2,6 +2,7 @@
   "name": "LearnUp — Apprendre sans limites",
   "short_name": "LearnUp",
   "description": "Plateforme d'apprentissage en ligne LMS",
+  "author": "SOH TANKOU JOËL VALDO",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F1117",
