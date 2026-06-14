@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/uploads/(.*)", "dest": "/uploads/$1" },
+    { "src": "/api/admin.php", "dest": "/api/admin.php" },
+    { "src": "/api/(.*)", "dest": "/api/index.php" },
+    { "src": "/dashboard/(.*).php", "dest": "/dashboard/$1.php" },
+    { "src": "/certificat.php", "dest": "/certificat.php" },
+    { "src": "/(.*)", "dest": "/index.php" }
+  ]
+}

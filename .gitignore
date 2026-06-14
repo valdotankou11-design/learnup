@@ -1,0 +1,8 @@
+uploads/pdfs/*
+uploads/videos/*
+!uploads/pdfs/.gitkeep
+!uploads/videos/.gitkeep
+.env
+*.log
+
+.vercel
