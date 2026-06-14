@@ -351,12 +351,11 @@ function etudiantsCours(): void {
    ÉTUDIANT
    ══════════════════════════════════════════════════════════════ */
 function coursDisponibles(): void {
-    if (!utilisateurConnecte()) repondreJSON(['succes' => false, 'message' => 'Non connecté.'], 401);
     $db   = getDB();
     $uid  = $_SESSION['user_id'] ?? 0;
     $stmt = $db->prepare('
         SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom," ",u.nom) AS enseignant,
+               CONCAT(u.prenom,' ',u.nom) AS enseignant,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM inscriptions WHERE cours_id=c.id AND etudiant_id=?) AS inscrit
         FROM cours c
@@ -389,7 +388,7 @@ function mesCoursEtudiant(): void {
     $db   = getDB();
     $stmt = $db->prepare('
         SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom," ",u.nom) AS enseignant,
+               CONCAT(u.prenom,' ',u.nom) AS enseignant,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM progression_lecons pl
                 JOIN lecons l ON l.id=pl.lecon_id

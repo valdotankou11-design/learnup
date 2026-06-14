@@ -140,12 +140,17 @@ function uploaderFichier(array $fichier, string $type): ?string {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200) return null;
+    if (!$response) return null;
 
     $data = json_decode($response, true);
-    return $data['secure_url'] ?? null;
+    // Cloudinary retourne 200 ou 201
+    if (isset($data['secure_url'])) return $data['secure_url'];
+    if (isset($data['url'])) return $data['url'];
+    return null;
 }
