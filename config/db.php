@@ -2,7 +2,6 @@
 /**
  * LearnUp — config/db.php
  * Configuration de la base de données et utilitaires session
- * Compatible Vercel (serverless PHP)
  */
 
 // ── Paramètres DB ────────────────────────────────────────────────────────────
@@ -12,6 +11,11 @@ define('DB_USER',    getenv('MYSQLUSER')     ?: getenv('MYSQL_USER')     ?: 'roo
 define('DB_PASS',    getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: '');
 define('DB_PORT',    getenv('MYSQLPORT')     ?: getenv('MYSQL_PORT')     ?: '3306');
 define('DB_CHARSET', 'utf8mb4');
+
+// ── Cloudinary ───────────────────────────────────────────────────────────────
+define('CLOUDINARY_CLOUD',  'dlbskcpkg');
+define('CLOUDINARY_KEY',    '376654279626337');
+define('CLOUDINARY_SECRET', 'WV6oFRDI8jCUWZD6L4Iyg3p7_OI');
 
 // ── Connexion PDO ────────────────────────────────────────────────────────────
 function getDB(): PDO {
@@ -23,6 +27,7 @@ function getDB(): PDO {
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
             ]);
         } catch (PDOException $e) {
             http_response_code(500);
@@ -32,11 +37,20 @@ function getDB(): PDO {
     return $pdo;
 }
 
-// ── Session (compatible Vercel /tmp) ─────────────────────────────────────────
+// ── Session ───────────────────────────────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.save_path', '/tmp');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.use_strict_mode', '1');
+    ini_set('session.cookie_secure', '1');
+    ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.gc_maxlifetime', '86400');
+    session_set_cookie_params([
+        'lifetime' => 86400,
+        'path'     => '/',
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -58,16 +72,14 @@ function utilisateurCourant(): ?array {
 
 function exigerConnexion(string $role = ''): void {
     if (!utilisateurConnecte()) {
-        header('Location: /index.php?redirect=' . urlencode($_SERVER['REQUEST_URI']));
-        exit;
+        repondreJSON(['succes' => false, 'message' => 'Non connecté.'], 401);
     }
     if ($role && $_SESSION['user_role'] !== $role) {
-        header('Location: /dashboard/' . $_SESSION['user_role'] . '.php');
-        exit;
+        repondreJSON(['succes' => false, 'message' => 'Accès refusé.'], 403);
     }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function repondreJSON(array $data, int $code = 200): void {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
@@ -83,20 +95,50 @@ function genererCode(int $longueur = 32): string {
     return bin2hex(random_bytes($longueur / 2));
 }
 
-// ── Upload fichier (désactivé sur Vercel — système de fichiers éphémère) ─────
+// ── Upload vers Cloudinary ────────────────────────────────────────────────────
 function uploaderFichier(array $fichier, string $type): ?string {
-    $dossiers   = ['pdf' => '/uploads/pdfs/', 'video' => '/uploads/videos/'];
-    $extensions = ['pdf' => ['pdf'], 'video' => ['mp4', 'webm', 'ogg', 'avi']];
+    $extensions = [
+        'pdf'   => ['pdf'],
+        'video' => ['mp4', 'webm', 'ogg', 'avi', 'mov'],
+    ];
 
     if ($fichier['error'] !== UPLOAD_ERR_OK) return null;
 
     $ext = strtolower(pathinfo($fichier['name'], PATHINFO_EXTENSION));
     if (!in_array($ext, $extensions[$type] ?? [])) return null;
 
-    $nom    = genererCode(16) . '_' . time() . '.' . $ext;
-    $chemin = __DIR__ . '/..' . $dossiers[$type] . $nom;
+    $timestamp    = time();
+    $publicId     = 'learnup/' . $type . 's/' . genererCode(16) . '_' . $timestamp;
+    $resourceType = ($type === 'pdf') ? 'raw' : 'video';
 
-    if (!move_uploaded_file($fichier['tmp_name'], $chemin)) return null;
+    // Signature
+    $paramsToSign = ['public_id' => $publicId, 'timestamp' => $timestamp];
+    ksort($paramsToSign);
+    $strToSign = http_build_query($paramsToSign) . CLOUDINARY_SECRET;
+    $signature = sha1($strToSign);
 
-    return $dossiers[$type] . $nom;
+    // Upload via cURL
+    $postFields = [
+        'file'      => new CURLFile($fichier['tmp_name'], $fichier['type'], $fichier['name']),
+        'public_id' => $publicId,
+        'timestamp' => $timestamp,
+        'api_key'   => CLOUDINARY_KEY,
+        'signature' => $signature,
+    ];
+
+    $url = 'https://api.cloudinary.com/v1_1/' . CLOUDINARY_CLOUD . '/' . $resourceType . '/upload';
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) return null;
+
+    $data = json_decode($response, true);
+    return $data['secure_url'] ?? null;
 }

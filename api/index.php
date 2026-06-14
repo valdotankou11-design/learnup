@@ -351,6 +351,7 @@ function etudiantsCours(): void {
    ÉTUDIANT
    ══════════════════════════════════════════════════════════════ */
 function coursDisponibles(): void {
+    if (!utilisateurConnecte()) repondreJSON(['succes' => false, 'message' => 'Non connecté.'], 401);
     $db   = getDB();
     $uid  = $_SESSION['user_id'] ?? 0;
     $stmt = $db->prepare('
