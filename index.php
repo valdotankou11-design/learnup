@@ -235,9 +235,20 @@ $onglet  = $_GET['onglet'] ?? 'connexion';
 
     @media (max-width: 900px) {
       body { flex-direction: column; }
-      .hero-panel { padding: 40px 24px; min-height: 300px; }
-      .auth-panel { width: 100%; min-width: 0; border-left: none; border-top: 1px solid var(--border); }
+      .hero-panel { padding: 40px 24px; min-height: auto; flex: none; }
+      .auth-panel { width: 100%; min-width: 0; border-left: none; border-top: 1px solid var(--border); flex: none; }
       .floating-card { display: none; }
+      .hero-stats { gap: 16px; }
+      .hero-stat-val { font-size: 1.6rem; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-panel { padding: 28px 18px; }
+      .auth-panel { padding: 28px 18px; }
+      .hero-stats { gap: 12px; }
+      .hero-stat-val { font-size: 1.3rem; }
+      .btn-lg { padding: 14px 20px; font-size: 0.95rem; }
+      .input-password-wrap .form-control { font-size: 0.95rem; }
     }
   </style>
 </head>
@@ -272,6 +283,13 @@ $onglet  = $_GET['onglet'] ?? 'connexion';
       <div class="hero-stat-val">100%</div>
       <div class="hero-stat-label">En ligne</div>
     </div>
+  </div>
+
+  <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08);">
+    <p style="font-size:0.72rem; color:rgba(255,255,255,0.3); letter-spacing:0.04em; line-height:1.6;">
+      &copy; 2026 <span style="color:rgba(255,255,255,0.55); font-weight:600;">SOH TANKOU JOËL VALDO</span><br/>
+      Tous droits réservés &mdash; LearnUp est une création originale protégée.
+    </p>
   </div>
 
   <!-- Cartes flottantes décoratives -->
