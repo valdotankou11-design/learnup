@@ -105,7 +105,14 @@ function uploaderFichier(array $fichier, string $type): ?string {
     if ($fichier['error'] !== UPLOAD_ERR_OK) return null;
 
     $ext = strtolower(pathinfo($fichier['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, $extensions[$type] ?? [])) return null;
+    // Accepter aussi sans extension ou extension inconnue pour PDF
+    if ($type === 'pdf' && !$ext) $ext = 'pdf';
+    if (!in_array($ext, $extensions[$type] ?? [])) {
+        // Vérifier le type MIME comme fallback
+        $mime = mime_content_type($fichier['tmp_name']);
+        if ($type === 'pdf' && $mime !== 'application/pdf') return null;
+        if ($type === 'video' && !str_starts_with($mime, 'video/')) return null;
+    }
 
     $timestamp    = time();
     $publicId     = 'learnup/' . $type . 's/' . genererCode(16) . '_' . $timestamp;
