@@ -1,560 +1,451 @@
 <?php
 /**
- * LearnUp — api/index.php
- * Point d'entrée unique pour toutes les requêtes Ajax
+ * LearnUp — index.php
+ * Page d'accueil + connexion/inscription
  */
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/config/db.php';
 
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
-
-switch ($action) {
-    // Auth
-    case 'connexion':         connexion();         break;
-    case 'inscription':       inscription();       break;
-    case 'deconnexion':       deconnexion();       break;
-
-    // Promoteur
-    case 'creer_module':      creerModule();       break;
-    case 'lister_modules':    listerModules();     break;
-    case 'supprimer_module':  supprimerModule();   break;
-    case 'attribuer_certificat': attribuerCertificat(); break;
-    case 'stats_promoteur':   statsPromoteur();    break;
-
-    // Enseignant
-    case 'creer_cours':       creerCours();        break;
-    case 'mes_cours':         mesCours();          break;
-    case 'creer_lecon':       creerLecon();        break;
-    case 'creer_evaluation':  creerEvaluation();   break;
-    case 'ajouter_question':  ajouterQuestion();   break;
-    case 'stats_enseignant':  statsEnseignant();   break;
-    case 'etudiants_cours':   etudiantsCours();    break;
-
-    // Étudiant
-    case 'cours_disponibles': coursDisponibles();  break;
-    case 'sinscrire_cours':   sInscrireCours();    break;
-    case 'mes_cours_etudiant':mesCoursEtudiant();  break;
-    case 'detail_cours':      detailCours();       break;
-    case 'marquer_lecon':     marquerLecon();      break;
-    case 'passer_evaluation': passerEvaluation();  break;
-    case 'progression_cours': progressionCours();  break;
-    case 'mes_certificats':   mesCertificats();    break;
-    case 'stats_etudiant':    statsEtudiant();     break;
-
-    // Actions supplémentaires (extra.php)
-    case 'detail_evaluation':         include __DIR__.'/extra.php'; exit;
-    case 'lister_utilisateurs':       include __DIR__.'/extra.php'; exit;
-    case 'trouver_utilisateur':       include __DIR__.'/extra.php'; exit;
-    case 'lister_certificats_promoteur': include __DIR__.'/extra.php'; exit;
-
-    default: repondreJSON(['succes' => false, 'message' => 'Action inconnue.'], 400);
+// Rediriger si déjà connecté
+if (utilisateurConnecte()) {
+    header('Location: /dashboard/' . $_SESSION['user_role'] . '.php');
+    exit;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   AUTH
-   ══════════════════════════════════════════════════════════════ */
-function connexion(): void {
-    $email = trim($_POST['email'] ?? '');
-    $mdp   = $_POST['mot_de_passe'] ?? '';
-
-    if (!$email || !$mdp) repondreJSON(['succes' => false, 'message' => 'Champs requis.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('SELECT * FROM users WHERE email = ? AND actif = 1');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    if (!$user || !password_verify($mdp, $user['mot_de_passe']))
-        repondreJSON(['succes' => false, 'message' => 'Identifiants incorrects.']);
-
-    $_SESSION['user_id']     = $user['id'];
-    $_SESSION['user_nom']    = $user['nom'];
-    $_SESSION['user_prenom'] = $user['prenom'];
-    $_SESSION['user_email']  = $user['email'];
-    $_SESSION['user_role']   = $user['role'];
-    $_SESSION['user_avatar'] = $user['avatar'];
-
-    repondreJSON(['succes' => true, 'role' => $user['role'], 'nom' => $user['prenom']]);
-}
-
-function inscription(): void {
-    $nom  = trim($_POST['nom']          ?? '');
-    $pren = trim($_POST['prenom']       ?? '');
-    $email= trim($_POST['email']        ?? '');
-    $mdp  = $_POST['mot_de_passe']      ?? '';
-    $role = $_POST['role']              ?? 'etudiant';
-
-    if (!$nom || !$pren || !$email || !$mdp)
-        repondreJSON(['succes' => false, 'message' => 'Tous les champs sont requis.']);
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL))
-        repondreJSON(['succes' => false, 'message' => 'E-mail invalide.']);
-    if (strlen($mdp) < 8)
-        repondreJSON(['succes' => false, 'message' => 'Mot de passe trop court (min. 8 caractères).']);
-    if (!in_array($role, ['etudiant','enseignant','promoteur']))
-        repondreJSON(['succes' => false, 'message' => 'Rôle invalide.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    if ($stmt->fetch()) repondreJSON(['succes' => false, 'message' => 'Cet e-mail est déjà utilisé.']);
-
-    $hash = password_hash($mdp, PASSWORD_DEFAULT);
-    $stmt = $db->prepare('INSERT INTO users (nom,prenom,email,mot_de_passe,role) VALUES (?,?,?,?,?)');
-    $stmt->execute([$nom, $pren, $email, $hash, $role]);
-
-    $id = $db->lastInsertId();
-    $_SESSION['user_id']     = $id;
-    $_SESSION['user_nom']    = $nom;
-    $_SESSION['user_prenom'] = $pren;
-    $_SESSION['user_email']  = $email;
-    $_SESSION['user_role']   = $role;
-
-    repondreJSON(['succes' => true, 'role' => $role]);
-}
-
-function deconnexion(): void {
-    session_destroy();
-    repondreJSON(['succes' => true]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   PROMOTEUR
-   ══════════════════════════════════════════════════════════════ */
-function creerModule(): void {
-    exigerConnexion('promoteur');
-    $titre = trim($_POST['titre'] ?? '');
-    $desc  = trim($_POST['description'] ?? '');
-    if (!$titre) repondreJSON(['succes' => false, 'message' => 'Titre requis.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('INSERT INTO modules (titre,description,promoteur_id) VALUES (?,?,?)');
-    $stmt->execute([$titre, $desc, $_SESSION['user_id']]);
-    repondreJSON(['succes' => true, 'module_id' => $db->lastInsertId()]);
-}
-
-function listerModules(): void {
-    $db   = getDB();
-    $stmt = $db->prepare('
-        SELECT m.*, u.nom, u.prenom,
-               (SELECT COUNT(*) FROM cours WHERE module_id = m.id) AS nb_cours
-        FROM modules m
-        JOIN users u ON u.id = m.promoteur_id
-        WHERE m.actif = 1
-        ORDER BY m.cree_le DESC
-    ');
-    $stmt->execute();
-    repondreJSON(['succes' => true, 'modules' => $stmt->fetchAll()]);
-}
-
-function supprimerModule(): void {
-    exigerConnexion('promoteur');
-    $id = (int)($_POST['module_id'] ?? 0);
-    $db = getDB();
-    $db->prepare('UPDATE modules SET actif=0 WHERE id=? AND promoteur_id=?')
-       ->execute([$id, $_SESSION['user_id']]);
-    repondreJSON(['succes' => true]);
-}
-
-function attribuerCertificat(): void {
-    exigerConnexion('promoteur');
-    $etudiantId = (int)($_POST['etudiant_id'] ?? 0);
-    $moduleId   = (int)($_POST['module_id']   ?? 0);
-    if (!$etudiantId || !$moduleId)
-        repondreJSON(['succes' => false, 'message' => 'Paramètres manquants.']);
-
-    $db   = getDB();
-    $code = genererCode(32);
-
-    try {
-        $db->prepare('INSERT INTO certificats (etudiant_id,module_id,code_unique) VALUES (?,?,?)')
-           ->execute([$etudiantId, $moduleId, $code]);
-        repondreJSON(['succes' => true, 'code' => $code]);
-    } catch (\Exception $e) {
-        repondreJSON(['succes' => false, 'message' => 'Certificat déjà délivré.']);
-    }
-}
-
-function statsPromoteur(): void {
-    exigerConnexion('promoteur');
-    $db  = getDB();
-    $pid = $_SESSION['user_id'];
-
-    $modules = $db->prepare('SELECT COUNT(*) FROM modules WHERE promoteur_id=? AND actif=1');
-    $modules->execute([$pid]);
-
-    $certifs = $db->prepare('SELECT COUNT(*) FROM certificats c JOIN modules m ON m.id=c.module_id WHERE m.promoteur_id=?');
-    $certifs->execute([$pid]);
-
-    $etudiants = $db->prepare('
-        SELECT COUNT(DISTINCT i.etudiant_id)
-        FROM inscriptions i JOIN cours co ON co.id=i.cours_id
-        JOIN modules m ON m.id=co.module_id WHERE m.promoteur_id=?
-    ');
-    $etudiants->execute([$pid]);
-
-    repondreJSON(['succes' => true, 'stats' => [
-        'modules'   => $modules->fetchColumn(),
-        'certificats'=> $certifs->fetchColumn(),
-        'etudiants' => $etudiants->fetchColumn(),
-    ]]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ENSEIGNANT
-   ══════════════════════════════════════════════════════════════ */
-function creerCours(): void {
-    exigerConnexion('enseignant');
-    $titre    = trim($_POST['titre']      ?? '');
-    $desc     = trim($_POST['description']?? '');
-    $moduleId = (int)($_POST['module_id'] ?? 0);
-    $niveau   = $_POST['niveau']          ?? 'debutant';
-    $duree    = (int)($_POST['duree']     ?? 0);
-
-    if (!$titre || !$moduleId)
-        repondreJSON(['succes' => false, 'message' => 'Titre et module requis.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('INSERT INTO cours (titre,description,module_id,enseignant_id,niveau,duree_heures) VALUES (?,?,?,?,?,?)');
-    $stmt->execute([$titre, $desc, $moduleId, $_SESSION['user_id'], $niveau, $duree]);
-    repondreJSON(['succes' => true, 'cours_id' => $db->lastInsertId()]);
-}
-
-function mesCours(): void {
-    exigerConnexion('enseignant');
-    $db   = getDB();
-    $stmt = $db->prepare('
-        SELECT c.*, m.titre AS module_titre,
-               (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
-               (SELECT COUNT(*) FROM inscriptions WHERE cours_id=c.id) AS nb_etudiants
-        FROM cours c JOIN modules m ON m.id=c.module_id
-        WHERE c.enseignant_id=? AND c.actif=1
-        ORDER BY c.cree_le DESC
-    ');
-    $stmt->execute([$_SESSION['user_id']]);
-    repondreJSON(['succes' => true, 'cours' => $stmt->fetchAll()]);
-}
-
-function creerLecon(): void {
-    exigerConnexion('enseignant');
-    $coursId = (int)($_POST['cours_id'] ?? 0);
-    $titre   = trim($_POST['titre']     ?? '');
-    $type    = $_POST['type']            ?? 'pdf';
-    $ordre   = (int)($_POST['ordre']    ?? 1);
-    $duree   = (int)($_POST['duree']    ?? 0);
-
-    if (!$coursId || !$titre)
-        repondreJSON(['succes' => false, 'message' => 'Paramètres manquants.']);
-
-    // Gérer l'upload
-    $fichier = null;
-    if ($type === 'video' && !empty($_POST['url_video'])) {
-        $fichier = trim($_POST['url_video']);
-    } elseif (isset($_FILES['fichier'])) {
-        $fichier = uploaderFichier($_FILES['fichier'], $type);
-        if (!$fichier) repondreJSON(['succes' => false, 'message' => 'Fichier invalide.']);
+$erreur  = '';
+$succes  = '';
+$onglet  = $_GET['onglet'] ?? 'connexion';
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LearnUp — Apprendre sans limites</title>
+  <link rel="stylesheet" href="/assets/css/style.css"/>
+  <style>
+    body {
+      display: flex;
+      min-height: 100vh;
+      background: var(--bg);
     }
 
-    if (!$fichier) repondreJSON(['succes' => false, 'message' => 'Fichier ou URL requis.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('INSERT INTO lecons (titre,cours_id,type,fichier,ordre,duree_min) VALUES (?,?,?,?,?,?)');
-    $stmt->execute([$titre, $coursId, $type, $fichier, $ordre, $duree]);
-    repondreJSON(['succes' => true, 'lecon_id' => $db->lastInsertId()]);
-}
-
-function creerEvaluation(): void {
-    exigerConnexion('enseignant');
-    $leconId     = (int)($_POST['lecon_id']      ?? 0);
-    $titre       = trim($_POST['titre']           ?? '');
-    $notePassage = (int)($_POST['note_passage']   ?? 50);
-    $duree       = (int)($_POST['duree']          ?? 30);
-
-    if (!$leconId || !$titre)
-        repondreJSON(['succes' => false, 'message' => 'Paramètres manquants.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('INSERT INTO evaluations (lecon_id,titre,note_passage,duree_min) VALUES (?,?,?,?)
-                          ON DUPLICATE KEY UPDATE titre=VALUES(titre),note_passage=VALUES(note_passage),duree_min=VALUES(duree_min)');
-    $stmt->execute([$leconId, $titre, $notePassage, $duree]);
-    repondreJSON(['succes' => true, 'eval_id' => $db->lastInsertId()]);
-}
-
-function ajouterQuestion(): void {
-    exigerConnexion('enseignant');
-    $evalId  = (int)($_POST['evaluation_id'] ?? 0);
-    $enonce  = trim($_POST['enonce']         ?? '');
-    $type    = $_POST['type']                ?? 'qcm';
-    $points  = (int)($_POST['points']        ?? 1);
-    $reponses= json_decode($_POST['reponses'] ?? '[]', true);
-
-    if (!$evalId || !$enonce)
-        repondreJSON(['succes' => false, 'message' => 'Paramètres manquants.']);
-
-    $db   = getDB();
-    $stmt = $db->prepare('INSERT INTO questions (evaluation_id,enonce,type,points) VALUES (?,?,?,?)');
-    $stmt->execute([$evalId, $enonce, $type, $points]);
-    $qId = $db->lastInsertId();
-
-    // Insérer les réponses
-    if (is_array($reponses)) {
-        $stmtR = $db->prepare('INSERT INTO reponses (question_id,texte,est_correcte,ordre) VALUES (?,?,?,?)');
-        foreach ($reponses as $i => $r) {
-            $stmtR->execute([$qId, $r['texte'], $r['correcte'] ? 1 : 0, $i+1]);
-        }
+    /* ── Panneau gauche ── */
+    .hero-panel {
+      flex: 1;
+      background: linear-gradient(135deg, #1A1D27 0%, #0F1117 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 56px;
+      position: relative;
+      overflow: hidden;
     }
 
-    repondreJSON(['succes' => true, 'question_id' => $qId]);
-}
-
-function statsEnseignant(): void {
-    exigerConnexion('enseignant');
-    $db  = getDB();
-    $eid = $_SESSION['user_id'];
-
-    $cours    = $db->prepare('SELECT COUNT(*) FROM cours WHERE enseignant_id=? AND actif=1');
-    $cours->execute([$eid]);
-
-    $lecons   = $db->prepare('SELECT COUNT(*) FROM lecons l JOIN cours c ON c.id=l.cours_id WHERE c.enseignant_id=? AND l.actif=1');
-    $lecons->execute([$eid]);
-
-    $etudiants= $db->prepare('SELECT COUNT(DISTINCT i.etudiant_id) FROM inscriptions i JOIN cours c ON c.id=i.cours_id WHERE c.enseignant_id=?');
-    $etudiants->execute([$eid]);
-
-    repondreJSON(['succes' => true, 'stats' => [
-        'cours'     => $cours->fetchColumn(),
-        'lecons'    => $lecons->fetchColumn(),
-        'etudiants' => $etudiants->fetchColumn(),
-    ]]);
-}
-
-function etudiantsCours(): void {
-    exigerConnexion('enseignant');
-    $coursId = (int)($_POST['cours_id'] ?? 0);
-    $db      = getDB();
-    $stmt    = $db->prepare('
-        SELECT u.id, u.nom, u.prenom, u.email, i.inscrit_le,
-               (SELECT AVG(re.note) FROM resultats_evaluations re
-                JOIN evaluations ev ON ev.id=re.evaluation_id
-                JOIN lecons l ON l.id=ev.lecon_id
-                WHERE l.cours_id=? AND re.etudiant_id=u.id) AS note_moy
-        FROM inscriptions i JOIN users u ON u.id=i.etudiant_id
-        WHERE i.cours_id=?
-        ORDER BY i.inscrit_le DESC
-    ');
-    $stmt->execute([$coursId, $coursId]);
-    repondreJSON(['succes' => true, 'etudiants' => $stmt->fetchAll()]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ÉTUDIANT
-   ══════════════════════════════════════════════════════════════ */
-function coursDisponibles(): void {
-    $db   = getDB();
-    $uid  = $_SESSION['user_id'] ?? 0;
-    $stmt = $db->prepare('
-        SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom," ",u.nom) AS enseignant,
-               (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
-               (SELECT COUNT(*) FROM inscriptions WHERE cours_id=c.id AND etudiant_id=?) AS inscrit
-        FROM cours c
-        JOIN modules m ON m.id=c.module_id
-        JOIN users u   ON u.id=c.enseignant_id
-        WHERE c.actif=1 AND m.actif=1
-        ORDER BY c.cree_le DESC
-    ');
-    $stmt->execute([$uid]);
-    repondreJSON(['succes' => true, 'cours' => $stmt->fetchAll()]);
-}
-
-function sInscrireCours(): void {
-    exigerConnexion('etudiant');
-    $coursId = (int)($_POST['cours_id'] ?? 0);
-    if (!$coursId) repondreJSON(['succes' => false, 'message' => 'Cours introuvable.']);
-
-    $db = getDB();
-    try {
-        $db->prepare('INSERT INTO inscriptions (etudiant_id,cours_id) VALUES (?,?)')
-           ->execute([$_SESSION['user_id'], $coursId]);
-        repondreJSON(['succes' => true]);
-    } catch (\Exception $e) {
-        repondreJSON(['succes' => false, 'message' => 'Déjà inscrit.']);
+    .hero-panel::before {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(108,99,255,0.15) 0%, transparent 70%);
+      top: -100px; left: -100px;
+      pointer-events: none;
     }
-}
-
-function mesCoursEtudiant(): void {
-    exigerConnexion('etudiant');
-    $db   = getDB();
-    $stmt = $db->prepare('
-        SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom," ",u.nom) AS enseignant,
-               (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
-               (SELECT COUNT(*) FROM progression_lecons pl
-                JOIN lecons l ON l.id=pl.lecon_id
-                WHERE l.cours_id=c.id AND pl.etudiant_id=? AND pl.termine=1) AS lecons_terminees
-        FROM inscriptions i
-        JOIN cours c ON c.id=i.cours_id
-        JOIN modules m ON m.id=c.module_id
-        JOIN users u ON u.id=c.enseignant_id
-        WHERE i.etudiant_id=? AND c.actif=1
-        ORDER BY i.inscrit_le DESC
-    ');
-    $stmt->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
-    repondreJSON(['succes' => true, 'cours' => $stmt->fetchAll()]);
-}
-
-function detailCours(): void {
-    $coursId = (int)($_POST['cours_id'] ?? 0);
-    $uid     = $_SESSION['user_id'] ?? 0;
-    $db      = getDB();
-
-    $stmt = $db->prepare('
-        SELECT l.*,
-               (SELECT id FROM evaluations WHERE lecon_id=l.id AND actif=1 LIMIT 1) AS evaluation_id,
-               (SELECT titre FROM evaluations WHERE lecon_id=l.id AND actif=1 LIMIT 1) AS evaluation_titre,
-               (SELECT note FROM resultats_evaluations WHERE evaluation_id=(SELECT id FROM evaluations WHERE lecon_id=l.id LIMIT 1) AND etudiant_id=?) AS ma_note,
-               (SELECT termine FROM progression_lecons WHERE lecon_id=l.id AND etudiant_id=?) AS terminee
-        FROM lecons l WHERE l.cours_id=? AND l.actif=1 ORDER BY l.ordre ASC
-    ');
-    $stmt->execute([$uid, $uid, $coursId]);
-    repondreJSON(['succes' => true, 'lecons' => $stmt->fetchAll()]);
-}
-
-function marquerLecon(): void {
-    exigerConnexion('etudiant');
-    $leconId = (int)($_POST['lecon_id'] ?? 0);
-    $db      = getDB();
-
-    $db->prepare('INSERT INTO progression_lecons (etudiant_id,lecon_id,termine,termine_le)
-                  VALUES (?,?,1,NOW())
-                  ON DUPLICATE KEY UPDATE termine=1, termine_le=NOW()')
-       ->execute([$_SESSION['user_id'], $leconId]);
-
-    repondreJSON(['succes' => true]);
-}
-
-function passerEvaluation(): void {
-    exigerConnexion('etudiant');
-    $evalId  = (int)($_POST['evaluation_id'] ?? 0);
-    $reponses= json_decode($_POST['reponses'] ?? '{}', true);
-    $uid     = $_SESSION['user_id'];
-
-    $db = getDB();
-
-    // Récupérer les questions et leurs bonnes réponses
-    $stmtQ = $db->prepare('SELECT q.*, r.id AS rep_id, r.est_correcte FROM questions q LEFT JOIN reponses r ON r.question_id=q.id WHERE q.evaluation_id=?');
-    $stmtQ->execute([$evalId]);
-    $rows = $stmtQ->fetchAll();
-
-    // Organiser par question
-    $questions = [];
-    foreach ($rows as $r) {
-        $qid = $r['id'];
-        if (!isset($questions[$qid])) {
-            $questions[$qid] = ['points' => $r['points'], 'correctes' => []];
-        }
-        if ($r['est_correcte']) $questions[$qid]['correctes'][] = $r['rep_id'];
+    .hero-panel::after {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(0,212,170,0.08) 0%, transparent 70%);
+      bottom: -80px; right: -80px;
+      pointer-events: none;
     }
 
-    // Calculer la note
-    $totalPoints = 0;
-    $pointsObtenus = 0;
-    $details = [];
+    .hero-logo {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--blanc);
+      margin-bottom: 56px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .hero-logo span { color: var(--violet); }
 
-    foreach ($questions as $qid => $q) {
-        $totalPoints += $q['points'];
-        $repEtudiant = $reponses[$qid] ?? null;
-        $correct = false;
-
-        if ($repEtudiant !== null) {
-            $repId = (int)$repEtudiant;
-            $correct = in_array($repId, $q['correctes']);
-            if ($correct) $pointsObtenus += $q['points'];
-        }
-
-        $details[] = ['question_id' => $qid, 'reponse_id' => $repEtudiant, 'correcte' => $correct];
+    .hero-titre {
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.15;
+      color: var(--blanc);
+      margin-bottom: 20px;
+    }
+    .hero-titre em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--violet), var(--menthe));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    $note = $totalPoints > 0 ? round(($pointsObtenus / $totalPoints) * 100, 2) : 0;
-
-    // Récupérer la note de passage
-    $evalInfo = $db->prepare('SELECT note_passage FROM evaluations WHERE id=?');
-    $evalInfo->execute([$evalId]);
-    $notePassage = $evalInfo->fetchColumn() ?: 50;
-    $reussi = $note >= $notePassage;
-
-    // Sauvegarder le résultat
-    $db->prepare('INSERT INTO resultats_evaluations (etudiant_id,evaluation_id,note,reussi)
-                  VALUES (?,?,?,?)
-                  ON DUPLICATE KEY UPDATE note=VALUES(note), reussi=VALUES(reussi), tentative=tentative+1, passe_le=NOW()')
-       ->execute([$uid, $evalId, $note, $reussi ? 1 : 0]);
-
-    $resId = $db->lastInsertId() ?: $db->query("SELECT id FROM resultats_evaluations WHERE etudiant_id=$uid AND evaluation_id=$evalId")->fetchColumn();
-
-    // Sauvegarder les réponses détaillées
-    foreach ($details as $d) {
-        $db->prepare('INSERT INTO reponses_etudiants (resultat_id,question_id,reponse_id,est_correcte) VALUES (?,?,?,?)
-                      ON DUPLICATE KEY UPDATE reponse_id=VALUES(reponse_id),est_correcte=VALUES(est_correcte)')
-           ->execute([$resId, $d['question_id'], $d['reponse_id'], $d['correcte'] ? 1 : 0]);
+    .hero-desc {
+      font-size: 1rem;
+      color: var(--texte2);
+      line-height: 1.7;
+      max-width: 440px;
+      margin-bottom: 48px;
     }
 
-    repondreJSON(['succes' => true, 'note' => $note, 'reussi' => $reussi, 'note_passage' => $notePassage]);
+    .hero-stats {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+    .hero-stat-val {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--blanc);
+    }
+    .hero-stat-label {
+      font-size: 0.8rem;
+      color: var(--texte3);
+      margin-top: 2px;
+    }
+
+    /* Floating cards décoratives */
+    .floating-card {
+      position: absolute;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: var(--texte2);
+      box-shadow: var(--ombre);
+      animation: flotter 4s ease-in-out infinite;
+    }
+    .floating-card:nth-child(2) { animation-delay: 1.5s; }
+    .floating-card:nth-child(3) { animation-delay: 3s; }
+    @keyframes flotter {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-8px); }
+    }
+
+    .fc-1 { bottom: 200px; right: 40px; }
+    .fc-2 { bottom: 120px; right: 60px; }
+    .fc-3 { bottom: 280px; right: 20px; }
+
+    /* ── Panneau droit (form) ── */
+    .auth-panel {
+      width: 480px;
+      min-width: 380px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 40px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+    }
+
+    .auth-titre {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .auth-sous-titre {
+      font-size: 0.88rem;
+      color: var(--texte2);
+      margin-bottom: 32px;
+    }
+
+    /* Onglets */
+    .auth-tabs {
+      display: flex;
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 9px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--texte2);
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      transition: all var(--transition);
+    }
+    .auth-tab.active {
+      background: var(--surface2);
+      color: var(--texte);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Séparateur */
+    .separateur {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--texte3);
+      font-size: 0.78rem;
+    }
+    .separateur::before, .separateur::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .role-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .role-option {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .role-option:hover, .role-option.selected {
+      border-color: var(--violet);
+      background: var(--violet-bg);
+    }
+    .role-option input { display: none; }
+    .role-option .role-icon { font-size: 1.4rem; margin-bottom: 4px; }
+    .role-option .role-nom {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--texte2);
+    }
+
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+      .hero-panel { padding: 40px 24px; min-height: 300px; }
+      .auth-panel { width: 100%; min-width: 0; border-left: none; border-top: 1px solid var(--border); }
+      .floating-card { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Panneau héro ── -->
+<div class="hero-panel">
+  <div class="hero-logo">Learn<span>Up</span></div>
+
+  <h1 class="hero-titre">
+    Apprenez.<br/>
+    Progressez.<br/>
+    <em>Certifiez-vous.</em>
+  </h1>
+
+  <p class="hero-desc">
+    LearnUp est la plateforme d'apprentissage en ligne qui connecte
+    enseignants et étudiants autour de cours structurés, d'évaluations
+    intelligentes et de certificats reconnus.
+  </p>
+
+  <div class="hero-stats">
+    <div>
+      <div class="hero-stat-val">3</div>
+      <div class="hero-stat-label">Rôles</div>
+    </div>
+    <div>
+      <div class="hero-stat-val">∞</div>
+      <div class="hero-stat-label">Cours</div>
+    </div>
+    <div>
+      <div class="hero-stat-val">100%</div>
+      <div class="hero-stat-label">En ligne</div>
+    </div>
+  </div>
+
+  <!-- Cartes flottantes décoratives -->
+  <div class="floating-card fc-1">
+    <span>🎓</span>
+    <div>
+      <div style="font-weight:600;color:var(--texte)">Module validé</div>
+      <div style="font-size:0.72rem">Développement Web</div>
+    </div>
+  </div>
+  <div class="floating-card fc-2" style="animation-delay:2s">
+    <span>📈</span>
+    <div>
+      <div style="font-weight:600;color:var(--texte)">Progression : 78%</div>
+      <div style="font-size:0.72rem">JavaScript Avancé</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Panneau auth ── -->
+<div class="auth-panel">
+  <h2 class="auth-titre">Bienvenue 👋</h2>
+  <p class="auth-sous-titre">Connectez-vous ou créez votre compte</p>
+
+  <!-- Onglets -->
+  <div class="auth-tabs">
+    <button class="auth-tab <?= $onglet==='connexion'?'active':'' ?>"
+            onclick="afficherOnglet('connexion')">Connexion</button>
+    <button class="auth-tab <?= $onglet==='inscription'?'active':'' ?>"
+            onclick="afficherOnglet('inscription')">Inscription</button>
+  </div>
+
+  <?php if ($erreur): ?>
+    <div class="alerte alerte-erreur">⚠️ <?= nettoyer($erreur) ?></div>
+  <?php endif; ?>
+  <?php if ($succes): ?>
+    <div class="alerte alerte-succes">✅ <?= nettoyer($succes) ?></div>
+  <?php endif; ?>
+
+  <!-- ── Formulaire Connexion ── -->
+  <div id="form-connexion" class="<?= $onglet!=='connexion'?'hidden':'' ?>">
+    <form id="form-login" onsubmit="seConnecter(event)">
+      <div class="form-group">
+        <label class="form-label">Adresse e-mail</label>
+        <input type="email" name="email" class="form-control" placeholder="vous@exemple.com" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <input type="password" name="mot_de_passe" class="form-control" placeholder="••••••••" required/>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="btn-login">
+        Se connecter
+      </button>
+    </form>
+  </div>
+
+  <!-- ── Formulaire Inscription ── -->
+  <div id="form-inscription" class="<?= $onglet!=='inscription'?'hidden':'' ?>">
+    <form id="form-register" onsubmit="sInscrire(event)">
+      <div class="form-group">
+        <label class="form-label">Je suis...</label>
+        <div class="role-selector">
+          <label class="role-option selected" id="role-etudiant">
+            <input type="radio" name="role" value="etudiant" checked/>
+            <div class="role-icon">🎓</div>
+            <div class="role-nom">Étudiant</div>
+          </label>
+          <label class="role-option" id="role-enseignant">
+            <input type="radio" name="role" value="enseignant"/>
+            <div class="role-icon">👨‍🏫</div>
+            <div class="role-nom">Enseignant</div>
+          </label>
+          <label class="role-option" id="role-promoteur">
+            <input type="radio" name="role" value="promoteur"/>
+            <div class="role-icon">🏛️</div>
+            <div class="role-nom">Promoteur</div>
+          </label>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Nom</label>
+          <input type="text" name="nom" class="form-control" placeholder="TANKOU" required/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prénom</label>
+          <input type="text" name="prenom" class="form-control" placeholder="Joël" required/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" name="email" class="form-control" placeholder="vous@exemple.com" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <input type="password" name="mot_de_passe" class="form-control" placeholder="Min. 8 caractères" minlength="8" required/>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" id="btn-register">
+        Créer mon compte
+      </button>
+    </form>
+  </div>
+
+  <div class="separateur">Comptes de démonstration</div>
+  <div style="font-size:0.78rem;color:var(--texte3);text-align:center;line-height:1.8;">
+    promoteur@learnup.cm / messi@learnup.cm / etudiant@learnup.cm<br/>
+    <strong style="color:var(--texte2)">Mot de passe : learnup2026</strong>
+  </div>
+</div>
+
+<style>.hidden { display: none !important; }</style>
+<script src="/assets/js/app.js"></script>
+<script>
+function afficherOnglet(onglet) {
+  document.getElementById('form-connexion').classList.toggle('hidden',  onglet !== 'connexion');
+  document.getElementById('form-inscription').classList.toggle('hidden', onglet !== 'inscription');
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && onglet === 'connexion') || (i === 1 && onglet === 'inscription'));
+  });
 }
 
-function progressionCours(): void {
-    exigerConnexion('etudiant');
-    $coursId = (int)($_POST['cours_id'] ?? 0);
-    $uid     = $_SESSION['user_id'];
-    $db      = getDB();
+// Sélecteur de rôle
+document.querySelectorAll('.role-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.role-option').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    opt.querySelector('input').checked = true;
+  });
+});
 
-    $total = $db->prepare('SELECT COUNT(*) FROM lecons WHERE cours_id=? AND actif=1');
-    $total->execute([$coursId]);
-    $nb = (int)$total->fetchColumn();
+async function seConnecter(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Connexion...';
 
-    $faites = $db->prepare('SELECT COUNT(*) FROM progression_lecons pl JOIN lecons l ON l.id=pl.lecon_id WHERE l.cours_id=? AND pl.etudiant_id=? AND pl.termine=1');
-    $faites->execute([$coursId, $uid]);
-    $done = (int)$faites->fetchColumn();
+  const form = e.target;
+  const data = await ajax('connexion', {
+    email:        form.email.value,
+    mot_de_passe: form.mot_de_passe.value,
+  });
 
-    $pct = $nb > 0 ? round(($done / $nb) * 100) : 0;
-
-    repondreJSON(['succes' => true, 'total' => $nb, 'terminees' => $done, 'pct' => $pct]);
+  if (data.succes) {
+    toast('Connexion réussie ! Redirection...', 'succes');
+    setTimeout(() => window.location.href = '/dashboard/' + data.role + '.php', 800);
+  } else {
+    toast(data.message || 'Identifiants incorrects.', 'erreur');
+    btn.disabled = false;
+    btn.textContent = 'Se connecter';
+  }
 }
 
-function mesCertificats(): void {
-    exigerConnexion('etudiant');
-    $db   = getDB();
-    $stmt = $db->prepare('
-        SELECT ce.*, m.titre AS module_titre, m.description AS module_desc
-        FROM certificats ce JOIN modules m ON m.id=ce.module_id
-        WHERE ce.etudiant_id=?
-        ORDER BY ce.delivre_le DESC
-    ');
-    $stmt->execute([$_SESSION['user_id']]);
-    repondreJSON(['succes' => true, 'certificats' => $stmt->fetchAll()]);
+async function sInscrire(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-register');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Création...';
+
+  const form = e.target;
+  const data = await ajax('inscription', {
+    nom:          form.nom.value,
+    prenom:       form.prenom.value,
+    email:        form.email.value,
+    mot_de_passe: form.mot_de_passe.value,
+    role:         form.role.value,
+  });
+
+  if (data.succes) {
+    toast('Compte créé ! Connexion en cours...', 'succes');
+    setTimeout(() => window.location.href = '/dashboard/' + data.role + '.php', 800);
+  } else {
+    toast(data.message || 'Erreur lors de l\'inscription.', 'erreur');
+    btn.disabled = false;
+    btn.textContent = 'Créer mon compte';
+  }
 }
-
-function statsEtudiant(): void {
-    exigerConnexion('etudiant');
-    $uid = $_SESSION['user_id'];
-    $db  = getDB();
-
-    $cours = $db->prepare('SELECT COUNT(*) FROM inscriptions WHERE etudiant_id=?');
-    $cours->execute([$uid]);
-
-    $terminees = $db->prepare('SELECT COUNT(*) FROM progression_lecons WHERE etudiant_id=? AND termine=1');
-    $terminees->execute([$uid]);
-
-    $noteMoy = $db->prepare('SELECT AVG(note) FROM resultats_evaluations WHERE etudiant_id=?');
-    $noteMoy->execute([$uid]);
-
-    $certifs = $db->prepare('SELECT COUNT(*) FROM certificats WHERE etudiant_id=?');
-    $certifs->execute([$uid]);
-
-    repondreJSON(['succes' => true, 'stats' => [
-        'cours'      => $cours->fetchColumn(),
-        'lecons'     => $terminees->fetchColumn(),
-        'note_moy'   => round($noteMoy->fetchColumn() ?? 0, 1),
-        'certificats'=> $certifs->fetchColumn(),
-    ]]);
-}
+</script>
+</body>
+</html>
