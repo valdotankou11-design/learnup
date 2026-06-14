@@ -32,20 +32,11 @@ function getDB(): PDO {
     return $pdo;
 }
 
-// ── Session (stockée en base de données pour Railway) ────────────────────────
+// ── Session (compatible Vercel /tmp) ─────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.save_path', '/tmp');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.use_strict_mode', '1');
-    ini_set('session.cookie_secure', '1');
-    ini_set('session.cookie_samesite', 'Lax');
-    ini_set('session.gc_maxlifetime', '86400');
-    session_set_cookie_params([
-        'lifetime' => 86400,
-        'path'     => '/',
-        'secure'   => true,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
     session_start();
 }
 
