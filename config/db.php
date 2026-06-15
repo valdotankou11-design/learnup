@@ -121,7 +121,12 @@ function uploaderFichier(array $fichier, string $type): ?string {
     // Signature
     $paramsToSign = ['public_id' => $publicId, 'timestamp' => $timestamp];
     ksort($paramsToSign);
-    $strToSign = http_build_query($paramsToSign) . CLOUDINARY_SECRET;
+    // Ne pas encoder les caractères spéciaux (/ etc.) dans la signature
+    $parts = [];
+    foreach ($paramsToSign as $k => $v) {
+        $parts[] = $k . '=' . $v;
+    }
+    $strToSign = implode('&', $parts) . CLOUDINARY_SECRET;
     $signature = sha1($strToSign);
 
     // Upload via cURL
