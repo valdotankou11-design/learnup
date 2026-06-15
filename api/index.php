@@ -25,6 +25,7 @@ switch ($action) {
 
     // Enseignant
     case 'creer_cours':       creerCours();        break;
+    case 'supprimer_cours':   supprimerCours();    break;
     case 'mes_cours':         mesCours();          break;
     case 'creer_lecon':       creerLecon();        break;
     case 'supprimer_lecon':   supprimerLecon();    break;
@@ -222,7 +223,23 @@ function creerCours(): void {
     repondreJSON(['succes' => true, 'cours_id' => $db->lastInsertId()]);
 }
 
-function mesCours(): void {
+function supprimerCours(): void {
+    exigerConnexion('enseignant');
+    $coursId = (int)($_POST['cours_id'] ?? 0);
+    if (!$coursId) repondreJSON(['succes' => false, 'message' => 'Cours introuvable.']);
+
+    $db = getDB();
+    // Vérifier que le cours appartient bien à cet enseignant
+    $stmt = $db->prepare('SELECT id FROM cours WHERE id = ? AND enseignant_id = ? AND actif = 1');
+    $stmt->execute([$coursId, $_SESSION['user_id']]);
+    if (!$stmt->fetch()) repondreJSON(['succes' => false, 'message' => 'Accès refusé ou cours introuvable.']);
+
+    // Suppression douce (soft delete)
+    $db->prepare('UPDATE cours SET actif = 0 WHERE id = ?')->execute([$coursId]);
+    repondreJSON(['succes' => true]);
+}
+
+
     exigerConnexion('enseignant');
     $db   = getDB();
     $stmt = $db->prepare('

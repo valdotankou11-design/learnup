@@ -311,6 +311,7 @@ function carteCoursEnseignant(c) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="ouvrirGestionCours(${c.id},'${escHtml(c.titre)}')">⚙️ Gérer</button>
         <button class="btn btn-outline btn-sm" onclick="voirEtudiants(${c.id})">👥 Étudiants</button>
+        <button class="btn btn-sm" style="background:rgba(255,80,80,0.15);color:#ff5050;border:1px solid rgba(255,80,80,0.3);" onclick="supprimerCours(${c.id},'${escHtml(c.titre)}')">🗑 Supprimer</button>
       </div>
     </div>`;
 }
@@ -449,6 +450,19 @@ async function soumettreLecon(e) {
   }
   btn.disabled = false;
   btn.textContent = 'Ajouter la leçon';
+}
+
+/* ══ Supprimer cours ══ */
+async function supprimerCours(coursId, titre) {
+  if (!confirm(`Supprimer le cours "${titre}" ?\n\nToutes les leçons et évaluations associées seront inaccessibles. Cette action est irréversible.`)) return;
+  const data = await ajax('supprimer_cours', { cours_id: coursId });
+  if (data.succes) {
+    toast('Cours supprimé.', 'succes');
+    chargerMesCours();
+    chargerAccueil();
+  } else {
+    toast(data.message || 'Erreur lors de la suppression.', 'erreur');
+  }
 }
 
 /* ══ Évaluation ══ */
