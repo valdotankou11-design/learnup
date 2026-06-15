@@ -710,10 +710,10 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     white-space: nowrap;
   }
 
-  /* Masquer colonnes peu importantes sur mobile */
-  th:nth-child(1), td:nth-child(1) { display: none; } /* ID */
+  /* Masquer colonne ID sur mobile */
+  th:nth-child(1), td:nth-child(1) { display: none; }
 
-  /* Tabs admin (Cours / Modules / Utilisateurs…) */
+  /* Tabs admin */
   .tabs {
     flex-wrap: wrap;
     gap: 6px;
@@ -736,39 +736,23 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     padding: 4px 6px;
     font-size: 0.8rem;
   }
-
-  /* Modal plein écran sur mobile */
-  .modal {
-    padding: 20px 16px;
-    max-height: 95vh;
-    border-radius: var(--radius) var(--radius) 0 0;
-    margin-top: auto;
-  }
-  .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
 }
 
 @media (max-width: 480px) {
 
-  /* Stats en 1 colonne sur très petit écran */
   .stats-grid {
     grid-template-columns: 1fr !important;
   }
 
-  /* Tableaux encore plus compacts */
   th, td {
     padding: 8px 8px;
     font-size: 0.73rem;
   }
 
-  /* Titre de section */
   .section-title {
     font-size: 1.1rem;
   }
 
-  /* Badge plus petit */
   .badge {
     font-size: 0.68rem;
     padding: 2px 6px;
