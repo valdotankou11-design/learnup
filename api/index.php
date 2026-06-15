@@ -351,7 +351,7 @@ function statsEnseignant(): void {
     $cours    = $db->prepare('SELECT COUNT(*) FROM cours WHERE enseignant_id=? AND actif=1');
     $cours->execute([$eid]);
 
-    $lecons   = $db->prepare('SELECT COUNT(*) FROM lecons l JOIN cours c ON c.id=l.cours_id WHERE c.enseignant_id=? AND l.actif=1');
+    $lecons   = $db->prepare('SELECT COUNT(*) FROM lecons l JOIN cours c ON c.id=l.cours_id WHERE c.enseignant_id=? AND l.actif=1 AND c.actif=1');
     $lecons->execute([$eid]);
 
     $etudiants= $db->prepare('SELECT COUNT(DISTINCT i.etudiant_id) FROM inscriptions i JOIN cours c ON c.id=i.cours_id WHERE c.enseignant_id=?');
