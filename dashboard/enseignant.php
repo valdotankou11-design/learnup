@@ -154,8 +154,26 @@ $user = utilisateurCourant();
         </div>
       </div>
       <div id="zone-video" class="form-group" style="display:none;">
-        <label class="form-label">URL de la vidéo (YouTube ou lien direct)</label>
-        <input type="url" id="lecon-url-video" class="form-control" placeholder="https://www.youtube.com/watch?v=..."/>
+        <label class="form-label">Source de la vidéo</label>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="video-source" value="url" checked onchange="toggleVideoSource('url')"/> 🔗 URL YouTube
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="radio" name="video-source" value="fichier" onchange="toggleVideoSource('fichier')"/> 📁 Fichier vidéo
+          </label>
+        </div>
+        <div id="zone-video-url">
+          <input type="url" id="lecon-url-video" class="form-control" placeholder="https://www.youtube.com/watch?v=..."/>
+        </div>
+        <div id="zone-video-fichier" style="display:none;">
+          <div class="form-upload" onclick="document.getElementById('input-video').click()">
+            <input type="file" id="input-video" accept=".mp4,.webm,.ogg,.avi,.mov"/>
+            <div style="font-size:2rem;margin-bottom:8px;">🎬</div>
+            <div style="font-weight:600;color:var(--texte)">Cliquez pour choisir une vidéo</div>
+            <div style="font-size:0.78rem;color:var(--texte3);margin-top:4px;" id="video-nom">MP4, WebM, AVI, MOV acceptés</div>
+          </div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-group">
@@ -361,6 +379,7 @@ async function rafraichirGestionCours() {
             ? `<span class="badge badge-menthe">✅ Éval. définie</span>`
             : `<button class="btn btn-outline btn-sm" onclick="ouvrirModalEval(${l.id})">➕ Ajouter éval.</button>`
           }
+          <button class="btn btn-sm" style="background:rgba(255,80,80,0.15);color:#ff5050;border:1px solid rgba(255,80,80,0.3);" onclick="supprimerLecon(${l.id})">🗑 Supprimer</button>
         </div>
       </div>`).join('')
     : '<div class="empty-state"><div class="icon">📖</div><h3>Aucune leçon</h3><p>Ajoutez votre première leçon</p></div>'}`;
@@ -378,6 +397,15 @@ function toggleTypeLecon(type) {
   document.getElementById('zone-pdf').style.display   = type === 'pdf'   ? 'block' : 'none';
   document.getElementById('zone-video').style.display = type === 'video' ? 'block' : 'none';
 }
+
+function toggleVideoSource(source) {
+  document.getElementById('zone-video-url').style.display    = source === 'url'     ? 'block' : 'none';
+  document.getElementById('zone-video-fichier').style.display = source === 'fichier' ? 'block' : 'none';
+}
+
+document.getElementById('input-video')?.addEventListener('change', function() {
+  document.getElementById('video-nom').textContent = this.files[0]?.name || 'MP4, WebM, AVI, MOV acceptés';
+});
 
 document.getElementById('input-pdf')?.addEventListener('change', function() {
   document.getElementById('pdf-nom').textContent = this.files[0]?.name || 'Format PDF uniquement';
@@ -401,7 +429,13 @@ async function soumettreLecon(e) {
     const f = document.getElementById('input-pdf').files[0];
     if (f) fd.append('fichier', f);
   } else {
-    fd.append('url_video', document.getElementById('lecon-url-video').value);
+    const videoSource = document.querySelector('input[name="video-source"]:checked')?.value || 'url';
+    if (videoSource === 'fichier') {
+      const fv = document.getElementById('input-video').files[0];
+      if (fv) fd.append('fichier', fv);
+    } else {
+      fd.append('url_video', document.getElementById('lecon-url-video').value);
+    }
   }
 
   const data = await ajaxFormData('creer_lecon', fd);
@@ -417,6 +451,17 @@ async function soumettreLecon(e) {
 }
 
 /* ══ Évaluation ══ */
+async function supprimerLecon(leconId) {
+  if (!confirm('Supprimer cette leçon ? Cette action est irréversible.')) return;
+  const data = await ajax('supprimer_lecon', { lecon_id: leconId });
+  if (data.succes) {
+    toast('Leçon supprimée.', 'succes');
+    rafraichirGestionCours();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
+}
+
 function ouvrirModalEval(leconId) {
   evalIdCourant = null;
   document.getElementById('eval-lecon-id').value = leconId;

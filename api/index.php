@@ -27,6 +27,7 @@ switch ($action) {
     case 'creer_cours':       creerCours();        break;
     case 'mes_cours':         mesCours();          break;
     case 'creer_lecon':       creerLecon();        break;
+    case 'supprimer_lecon':   supprimerLecon();    break;
     case 'creer_evaluation':  creerEvaluation();   break;
     case 'ajouter_question':  ajouterQuestion();   break;
     case 'stats_enseignant':  statsEnseignant();   break;
@@ -262,6 +263,23 @@ function creerLecon(): void {
     $stmt = $db->prepare('INSERT INTO lecons (titre,cours_id,type,fichier,ordre,duree_min) VALUES (?,?,?,?,?,?)');
     $stmt->execute([$titre, $coursId, $type, $fichier, $ordre, $duree]);
     repondreJSON(['succes' => true, 'lecon_id' => $db->lastInsertId()]);
+}
+
+function supprimerLecon(): void {
+    exigerConnexion('enseignant');
+    $leconId = (int)($_POST['lecon_id'] ?? 0);
+    if (!$leconId) repondreJSON(['succes' => false, 'message' => 'Leçon introuvable.']);
+    $db = getDB();
+    // Vérifier que la leçon appartient à un cours de cet enseignant
+    $stmt = $db->prepare('
+        SELECT l.id FROM lecons l
+        JOIN cours c ON c.id = l.cours_id
+        WHERE l.id = ? AND c.enseignant_id = ?
+    ');
+    $stmt->execute([$leconId, $_SESSION['user_id']]);
+    if (!$stmt->fetch()) repondreJSON(['succes' => false, 'message' => 'Accès refusé.']);
+    $db->prepare('DELETE FROM lecons WHERE id = ?')->execute([$leconId]);
+    repondreJSON(['succes' => true]);
 }
 
 function creerEvaluation(): void {
