@@ -154,6 +154,17 @@ function adminSupprimerUser(): void {
         repondreJSON(['succes' => false, 'message' => 'Impossible de supprimer votre propre compte.']);
 
     $db = getDB();
+
+    // Vérifier si c'est le dernier admin
+    $roleStmt = $db->prepare('SELECT role FROM users WHERE id = ?');
+    $roleStmt->execute([$id]);
+    $user = $roleStmt->fetch();
+    if ($user && $user['role'] === 'admin') {
+        $nbAdmins = $db->query('SELECT COUNT(*) FROM users WHERE role = 'admin'')->fetchColumn();
+        if ($nbAdmins <= 1)
+            repondreJSON(['succes' => false, 'message' => 'Impossible de supprimer le dernier compte admin.']);
+    }
+
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
     repondreJSON(['succes' => true, 'message' => 'Utilisateur supprimé.']);
 }
