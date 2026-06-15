@@ -102,6 +102,14 @@ function uploaderFichier(array $fichier, string $type): ?string {
         'video' => ['mp4', 'webm', 'ogg', 'avi', 'mov'],
     ];
 
+    // Augmenter les limites PHP pour les gros fichiers
+    @ini_set('upload_max_filesize', '500M');
+    @ini_set('post_max_size', '500M');
+    @ini_set('max_execution_time', '300');
+
+    if ($fichier['error'] === UPLOAD_ERR_INI_SIZE || $fichier['error'] === UPLOAD_ERR_FORM_SIZE) {
+        repondreJSON(['succes' => false, 'message' => 'Fichier trop volumineux. Limite: 500MB.']);
+    }
     if ($fichier['error'] !== UPLOAD_ERR_OK) return null;
 
     $ext = strtolower(pathinfo($fichier['name'], PATHINFO_EXTENSION));
@@ -121,12 +129,8 @@ function uploaderFichier(array $fichier, string $type): ?string {
     // Signature
     $paramsToSign = ['public_id' => $publicId, 'timestamp' => $timestamp];
     ksort($paramsToSign);
-    // Ne pas encoder les caractères spéciaux (/ etc.) dans la signature
-    $parts = [];
-    foreach ($paramsToSign as $k => $v) {
-        $parts[] = $k . '=' . $v;
-    }
-    $strToSign = implode('&', $parts) . CLOUDINARY_SECRET;
+    // Cloudinary signature: paramètres triés alphabétiquement + secret
+    $strToSign = 'public_id=' . $publicId . '&timestamp=' . (string)$timestamp . CLOUDINARY_SECRET;
     $signature = sha1($strToSign);
 
     // Upload via cURL
