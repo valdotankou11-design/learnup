@@ -403,6 +403,7 @@ function toggleVideoSource(source) {
   document.getElementById('zone-video-fichier').style.display = source === 'fichier' ? 'block' : 'none';
 }
 
+
 document.getElementById('input-video')?.addEventListener('change', function() {
   document.getElementById('video-nom').textContent = this.files[0]?.name || 'MP4, WebM, AVI, MOV acceptés';
 });
@@ -461,6 +462,7 @@ async function supprimerLecon(leconId) {
     toast(data.message || 'Erreur.', 'erreur');
   }
 }
+
 
 function ouvrirModalEval(leconId) {
   evalIdCourant = null;

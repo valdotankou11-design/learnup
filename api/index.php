@@ -371,8 +371,7 @@ function etudiantsCours(): void {
 function coursDisponibles(): void {
     $db   = getDB();
     $uid  = $_SESSION['user_id'] ?? 0;
-    $stmt = $db->prepare('
-        SELECT c.*, m.titre AS module_titre,
+    $sql = "SELECT c.*, m.titre AS module_titre,
                CONCAT(u.prenom,' ',u.nom) AS enseignant,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM inscriptions WHERE cours_id=c.id AND etudiant_id=?) AS inscrit
@@ -380,8 +379,8 @@ function coursDisponibles(): void {
         JOIN modules m ON m.id=c.module_id
         JOIN users u   ON u.id=c.enseignant_id
         WHERE c.actif=1 AND m.actif=1
-        ORDER BY c.cree_le DESC
-    ');
+        ORDER BY c.cree_le DESC";
+    $stmt = $db->prepare($sql);
     $stmt->execute([$uid]);
     repondreJSON(['succes' => true, 'cours' => $stmt->fetchAll()]);
 }
@@ -404,8 +403,7 @@ function sInscrireCours(): void {
 function mesCoursEtudiant(): void {
     exigerConnexion('etudiant');
     $db   = getDB();
-    $stmt = $db->prepare('
-        SELECT c.*, m.titre AS module_titre,
+    $sql2 = "SELECT c.*, m.titre AS module_titre,
                CONCAT(u.prenom,' ',u.nom) AS enseignant,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM progression_lecons pl
@@ -416,8 +414,8 @@ function mesCoursEtudiant(): void {
         JOIN modules m ON m.id=c.module_id
         JOIN users u ON u.id=c.enseignant_id
         WHERE i.etudiant_id=? AND c.actif=1
-        ORDER BY i.inscrit_le DESC
-    ');
+        ORDER BY i.inscrit_le DESC";
+    $stmt = $db->prepare($sql2);
     $stmt->execute([$_SESSION['user_id'], $_SESSION['user_id']]);
     repondreJSON(['succes' => true, 'cours' => $stmt->fetchAll()]);
 }
