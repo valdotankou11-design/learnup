@@ -160,7 +160,7 @@ function adminSupprimerUser(): void {
     $roleStmt->execute([$id]);
     $user = $roleStmt->fetch();
     if ($user && $user['role'] === 'admin') {
-        $nbAdmins = $db->query('SELECT COUNT(*) FROM users WHERE role = 'admin'')->fetchColumn();
+        $nbAdmins = $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
         if ($nbAdmins <= 1)
             repondreJSON(['succes' => false, 'message' => 'Impossible de supprimer le dernier compte admin.']);
     }
