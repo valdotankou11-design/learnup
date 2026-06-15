@@ -696,18 +696,26 @@ async function chargerCours() {
       <td style="font-size:0.78rem;">${niveaux[c.niveau] || c.niveau}</td>
       <td><span class="badge badge-violet">${c.nb_lecons}</span></td>
       <td><span class="badge badge-menthe">${c.nb_inscrits}</span></td>
+      <td><span class="actif-dot ${c.actif ? 'on' : 'off'}"></span>${c.actif ? 'Actif' : 'Supprimé'}</td>
       <td>
-        <button class="btn-icon del" title="Supprimer" onclick="supprimerCours(${c.id})">🗑️</button>
+        ${!c.actif ? `<button class="btn-icon" title="Réactiver" onclick="reactiverCours(${c.id})" style="color:var(--menthe);">🔓</button>` : ''}
+        <button class="btn-icon del" title="Supprimer définitivement" onclick="supprimerCours(${c.id})">🗑️</button>
       </td>
     </tr>`).join('');
 }
 
 async function supprimerCours(id) {
-  confirmer('⚠️ Supprimer ce cours, ses leçons et toutes les données associées ?', async () => {
+  confirmer('⚠️ Supprimer définitivement ce cours et toutes les données associées ?', async () => {
     const data = await adminAjax('admin_supprimer_cours', { cours_id: id });
     if (data.succes) { toast(data.message, 'succes'); chargerCours(); }
     else toast(data.message, 'erreur');
   });
+}
+
+async function reactiverCours(id) {
+  const data = await adminAjax('admin_reactiver_cours', { cours_id: id });
+  if (data.succes) { toast('Cours réactivé !', 'succes'); chargerCours(); }
+  else toast(data.message, 'erreur');
 }
 
 /* ══════════════════════════════════════════════════════════════

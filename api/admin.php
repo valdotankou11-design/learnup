@@ -22,6 +22,7 @@ switch ($action) {
     case 'admin_certificats':        adminCertificats();        break;
     case 'admin_supprimer_module':   adminSupprimerModule();    break;
     case 'admin_supprimer_cours':    adminSupprimerCours();     break;
+    case 'admin_reactiver_cours':     adminReactiverCours();     break;
     case 'admin_supprimer_certificat': adminSupprimerCertificat(); break;
     case 'admin_activite':           adminActivite();           break;
     case 'admin_reset_mdp':          adminResetMdp();           break;
@@ -259,6 +260,15 @@ function adminSupprimerCours(): void {
     $db = getDB();
     $db->prepare('DELETE FROM cours WHERE id = ?')->execute([$id]);
     repondreJSON(['succes' => true, 'message' => 'Cours supprimé.']);
+}
+
+function adminReactiverCours(): void {
+    exigerAdmin();
+    $id = (int)($_POST['cours_id'] ?? 0);
+    if (!$id) repondreJSON(['succes' => false, 'message' => 'ID manquant.']);
+    $db = getDB();
+    $db->prepare('UPDATE cours SET actif = 1 WHERE id = ?')->execute([$id]);
+    repondreJSON(['succes' => true, 'message' => 'Cours réactivé.']);
 }
 
 /* ══════════════════════════════════════════════════════════════

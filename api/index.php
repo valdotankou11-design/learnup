@@ -140,7 +140,7 @@ function listerModules(): void {
     $db   = getDB();
     $stmt = $db->prepare('
         SELECT m.*, u.nom, u.prenom,
-               (SELECT COUNT(*) FROM cours WHERE module_id = m.id) AS nb_cours
+               (SELECT COUNT(*) FROM cours WHERE module_id = m.id AND actif = 1) AS nb_cours
         FROM modules m
         JOIN users u ON u.id = m.promoteur_id
         WHERE m.actif = 1
