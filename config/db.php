@@ -123,15 +123,16 @@ function uploaderFichier(array $fichier, string $type): ?string {
     }
 
     $timestamp    = time();
-    $publicId     = 'learnup/' . $type . 's/' . genererCode(16) . '_' . $timestamp;
+    $uniqueId     = bin2hex(random_bytes(8));
+    $publicId     = 'learnup/' . $type . 's/' . $uniqueId;
     $resourceType = ($type === 'pdf') ? 'raw' : 'video';
 
     // Signature
     $paramsToSign = ['public_id' => $publicId, 'timestamp' => $timestamp];
     ksort($paramsToSign);
-    // Cloudinary signature: paramètres triés alphabétiquement + secret
-    $strToSign = 'public_id=' . $publicId . '&timestamp=' . (string)$timestamp . CLOUDINARY_SECRET;
-    $signature = sha1($strToSign);
+    // Cloudinary signature correcte
+    $strToSign = 'public_id=' . $publicId . '&timestamp=' . $timestamp . CLOUDINARY_SECRET;
+    $signature = hash('sha1', $strToSign);
 
     // Upload via cURL
     $postFields = [
