@@ -239,7 +239,7 @@ function supprimerCours(): void {
     repondreJSON(['succes' => true]);
 }
 
-
+function mesCours(): void {
     exigerConnexion('enseignant');
     $db   = getDB();
     $stmt = $db->prepare('
