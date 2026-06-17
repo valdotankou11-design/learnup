@@ -649,6 +649,8 @@ function traiterSuggestion(): void {
 
     repondreJSON(['succes' => true, 'message' => 'Suggestion traitée.']);
 }
+
+function statsEtudiant(): void {
     exigerConnexion('etudiant');
     $uid = $_SESSION['user_id'];
     $db  = getDB();
