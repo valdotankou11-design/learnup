@@ -22,6 +22,7 @@ $user = utilisateurCourant();
     <li><a href="#" onclick="afficherSection('accueil')"    id="nav-accueil"   class="active">🏠 Accueil</a></li>
     <li><a href="#" onclick="afficherSection('mes-cours')"  id="nav-mes-cours">📚 Mes cours</a></li>
     <li><a href="#" onclick="afficherSection('creer-cours')"id="nav-creer">➕ Créer un cours</a></li>
+    <li><a href="#" onclick="afficherSection('suggestions')" id="nav-suggestions">💡 Suggestions</a></li>
   </ul>
   <div class="navbar-user">
     <span style="font-size:0.85rem;color:var(--texte2)">👨‍🏫 <?= htmlspecialchars($user['prenom']) ?></span>
@@ -36,6 +37,7 @@ $user = utilisateurCourant();
       <a href="#" class="sidebar-link active" onclick="afficherSection('accueil')"    id="sl-accueil">   <span class="icon">🏠</span> Tableau de bord</a>
       <a href="#" class="sidebar-link"        onclick="afficherSection('mes-cours')"  id="sl-mes-cours"> <span class="icon">📚</span> Mes cours</a>
       <a href="#" class="sidebar-link"        onclick="afficherSection('creer-cours')"id="sl-creer">     <span class="icon">➕</span> Créer un cours</a>
+      <a href="#" class="sidebar-link"        onclick="afficherSection('suggestions')" id="sl-suggestions"><span class="icon">💡</span> Suggestions</a>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Compte</div>
@@ -104,6 +106,15 @@ $user = utilisateurCourant();
           <button type="submit" class="btn btn-primary btn-lg" id="btn-creer-cours">Créer le cours</button>
         </form>
       </div>
+    </section>
+
+    <!-- ══ SUGGESTIONS DE MODULES ══ -->
+    <section id="section-suggestions" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <div><h1>💡 Suggestions de modules</h1><p>Proposez de nouveaux modules au promoteur</p></div>
+        <button class="btn btn-primary" onclick="ouvrirModal('modal-suggestion')">➕ Nouvelle suggestion</button>
+      </div>
+      <div id="liste-mes-suggestions"></div>
     </section>
 
   </main>
@@ -250,6 +261,34 @@ $user = utilisateurCourant();
   </div>
 </div>
 
+<!-- ══ MODAL : Suggérer un module ══ -->
+<div class="modal-overlay" id="modal-suggestion">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3>💡 Suggérer un nouveau module</h3>
+      <button class="btn-close" onclick="fermerModal('modal-suggestion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Titre du module *</label>
+        <input type="text" id="sug-titre" class="form-control" placeholder="Ex : Intelligence Artificielle Appliquée" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea id="sug-description" class="form-control" rows="3" placeholder="Décrivez brièvement le contenu de ce module…"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Justification / Pourquoi ce module ?</label>
+        <textarea id="sug-justification" class="form-control" rows="3" placeholder="Expliquez l'intérêt pédagogique de ce module…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-suggestion')">Annuler</button>
+      <button class="btn btn-primary" onclick="envoyerSuggestion()">📤 Envoyer la suggestion</button>
+    </div>
+  </div>
+</div>
+
 <script src="/assets/js/app.js"></script>
 <script>
 let coursIdCourant = null;
@@ -263,9 +302,10 @@ function afficherSection(id) {
   document.getElementById('sl-'  + id)?.classList.add('active');
   document.getElementById('nav-' + id)?.classList.add('active');
   const loaders = {
-    'accueil':    chargerAccueil,
-    'mes-cours':  chargerMesCours,
-    'creer-cours':chargerModulesPourSelect,
+    'accueil':     chargerAccueil,
+    'mes-cours':   chargerMesCours,
+    'creer-cours': chargerModulesPourSelect,
+    'suggestions': chargerMesSuggestions,
   };
   loaders[id]?.();
 }
@@ -589,6 +629,53 @@ async function voirEtudiants(coursId) {
 async function seDeconnecter() {
   await ajax('deconnexion');
   window.location.href = '/';
+}
+
+/* ══ Suggestions de modules ══ */
+async function chargerMesSuggestions() {
+  const el = document.getElementById('liste-mes-suggestions');
+  el.innerHTML = '<p style="color:var(--texte2)">Chargement…</p>';
+  const data = await ajax('mes_suggestions');
+  if (!data.succes || !data.suggestions.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">💡</div><h3>Aucune suggestion envoyée</h3><p>Proposez de nouveaux modules au promoteur.</p><button class="btn btn-primary" onclick="ouvrirModal('modal-suggestion')">➕ Nouvelle suggestion</button></div>`;
+    return;
+  }
+  const badges = { en_attente: ['orange','⏳','En attente'], acceptee: ['menthe','✅','Acceptée'], refusee: ['rouge','❌','Refusée'] };
+  el.innerHTML = data.suggestions.map(s => {
+    const [couleur, icone, label] = badges[s.statut] || ['texte2','?','Inconnu'];
+    return `<div class="card" style="margin-bottom:16px;padding:20px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:4px;">${escHtml(s.titre)}</div>
+          ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
+          ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
+          ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Réponse du promoteur :</strong> ${escHtml(s.commentaire)}</p>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <span class="badge badge-${couleur}">${icone} ${label}</span>
+          <div style="font-size:0.8rem;color:var(--texte2);margin-top:6px;">${formatDate(s.cree_le)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function envoyerSuggestion() {
+  const titre         = document.getElementById('sug-titre').value.trim();
+  const description   = document.getElementById('sug-description').value.trim();
+  const justification = document.getElementById('sug-justification').value.trim();
+  if (!titre) { toast('Le titre est requis.', 'erreur'); return; }
+  const data = await ajax('envoyer_suggestion', { titre, description, justification });
+  if (data.succes) {
+    toast(data.message, 'succes');
+    fermerModal('modal-suggestion');
+    document.getElementById('sug-titre').value = '';
+    document.getElementById('sug-description').value = '';
+    document.getElementById('sug-justification').value = '';
+    chargerMesSuggestions();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
 }
 
 // Init

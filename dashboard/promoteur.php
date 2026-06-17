@@ -23,6 +23,7 @@ $user = utilisateurCourant();
     <li><a href="#" onclick="afficherSection('modules')"   id="nav-modules">📦 Modules</a></li>
     <li><a href="#" onclick="afficherSection('certificats')" id="nav-certificats">🏆 Certificats</a></li>
     <li><a href="#" onclick="afficherSection('utilisateurs')" id="nav-users">👥 Utilisateurs</a></li>
+    <li><a href="#" onclick="afficherSection('suggestions')" id="nav-suggestions">💡 Suggestions</a></li>
   </ul>
   <div class="navbar-user">
     <span style="font-size:0.85rem;color:var(--texte2)">🏛️ <?= htmlspecialchars($user['prenom']) ?></span>
@@ -38,6 +39,7 @@ $user = utilisateurCourant();
       <a href="#" class="sidebar-link"        onclick="afficherSection('modules')"      id="sl-modules">     <span class="icon">📦</span> Modules</a>
       <a href="#" class="sidebar-link"        onclick="afficherSection('certificats')"  id="sl-certificats"> <span class="icon">🏆</span> Certificats</a>
       <a href="#" class="sidebar-link"        onclick="afficherSection('utilisateurs')" id="sl-utilisateurs"><span class="icon">👥</span> Utilisateurs</a>
+      <a href="#" class="sidebar-link"        onclick="afficherSection('suggestions')"  id="sl-suggestions"> <span class="icon">💡</span> Suggestions</a>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-label">Compte</div>
@@ -85,13 +87,21 @@ $user = utilisateurCourant();
       <div id="liste-certifs-promoteur"></div>
     </section>
 
-    <!-- ══ UTILISATEURS ══ -->
-    <section id="section-utilisateurs" style="display:none;">
+    <!-- ══ UTILISATEURS ══ -->\n    <section id="section-utilisateurs" style="display:none;">
       <div style="margin-bottom:24px;">
         <h1>Utilisateurs</h1>
         <p>Tous les membres de la plateforme</p>
       </div>
       <div id="liste-utilisateurs"></div>
+    </section>
+
+    <!-- ══ SUGGESTIONS DE MODULES ══ -->
+    <section id="section-suggestions" style="display:none;">
+      <div style="margin-bottom:24px;">
+        <h1>💡 Suggestions de modules</h1>
+        <p>Propositions de nouveaux modules soumises par les enseignants</p>
+      </div>
+      <div id="liste-suggestions-promoteur"></div>
     </section>
 
   </main>
@@ -143,6 +153,26 @@ $user = utilisateurCourant();
   </div>
 </div>
 
+<!-- ══ MODAL : Traiter une suggestion ══ -->
+<div class="modal-overlay" id="modal-traitement">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 id="modal-traitement-titre">Traiter la suggestion</h3>
+      <button class="btn-close" onclick="fermerModal('modal-traitement')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Commentaire pour l'enseignant (optionnel)</label>
+        <textarea id="sug-commentaire" class="form-control" rows="3" placeholder="Expliquez votre décision…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fermerModal('modal-traitement')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmerTraitement()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <script src="/assets/js/app.js"></script>
 <script>
 /* ══ Navigation ══ */
@@ -157,6 +187,7 @@ function afficherSection(id) {
     'modules':      chargerModules,
     'certificats':  chargerCertificats,
     'utilisateurs': chargerUtilisateurs,
+    'suggestions':  chargerSuggestions,
   };
   loaders[id]?.();
 }
@@ -320,6 +351,62 @@ async function chargerUtilisateurs() {
 async function seDeconnecter() {
   await ajax('deconnexion');
   window.location.href = '/';
+}
+
+/* ══ Suggestions de modules ══ */
+async function chargerSuggestions() {
+  const el = document.getElementById('liste-suggestions-promoteur');
+  el.innerHTML = '<p style="color:var(--texte2)">Chargement…</p>';
+  const data = await ajax('lister_suggestions');
+  if (!data.succes || !data.suggestions.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">💡</div><h3>Aucune suggestion reçue</h3><p>Les enseignants n'ont pas encore soumis de suggestions.</p></div>`;
+    return;
+  }
+  const badges = { en_attente: ['orange','⏳','En attente'], acceptee: ['menthe','✅','Acceptée'], refusee: ['rouge','❌','Refusée'] };
+  el.innerHTML = data.suggestions.map(s => {
+    const [couleur, icone, label] = badges[s.statut] || ['texte2','?','Inconnu'];
+    const boutons = s.statut === 'en_attente' ? `
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="ouvrirTraitement(${s.id},'acceptee')">✅ Accepter</button>
+        <button class="btn btn-sm btn-outline" style="color:var(--rouge);border-color:var(--rouge);" onclick="ouvrirTraitement(${s.id},'refusee')">❌ Refuser</button>
+      </div>` : '';
+    return `<div class="card" style="margin-bottom:16px;padding:20px;" id="sug-card-${s.id}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:1.05rem;margin-bottom:4px;">${escHtml(s.titre)}</div>
+          <div style="font-size:0.85rem;color:var(--violet);margin-bottom:8px;">👤 ${escHtml(s.enseignant_prenom)} ${escHtml(s.enseignant_nom)}</div>
+          ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
+          ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
+          ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Votre réponse :</strong> ${escHtml(s.commentaire)}</p>` : ''}
+          ${boutons}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <span class="badge badge-${couleur}">${icone} ${label}</span>
+          <div style="font-size:0.8rem;color:var(--texte2);margin-top:6px;">${formatDate(s.cree_le)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let _sugId = null; let _sugStatut = null;
+function ouvrirTraitement(id, statut) {
+  _sugId = id; _sugStatut = statut;
+  const titre = statut === 'acceptee' ? '✅ Accepter la suggestion' : '❌ Refuser la suggestion';
+  document.getElementById('modal-traitement-titre').textContent = titre;
+  document.getElementById('sug-commentaire').value = '';
+  ouvrirModal('modal-traitement');
+}
+async function confirmerTraitement() {
+  const commentaire = document.getElementById('sug-commentaire').value.trim();
+  const data = await ajax('traiter_suggestion', { id: _sugId, statut: _sugStatut, commentaire });
+  if (data.succes) {
+    toast(data.message, 'succes');
+    fermerModal('modal-traitement');
+    chargerSuggestions();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
 }
 
 // Init

@@ -45,6 +45,12 @@ switch ($action) {
     case 'mes_certificats':   mesCertificats();    break;
     case 'stats_etudiant':    statsEtudiant();     break;
 
+    // Suggestions de modules (enseignant → promoteur)
+    case 'envoyer_suggestion':    envoyerSuggestion();    break;
+    case 'mes_suggestions':       mesSuggestions();       break;
+    case 'lister_suggestions':    listerSuggestions();    break;
+    case 'traiter_suggestion':    traiterSuggestion();    break;
+
     // Actions supplémentaires (extra.php)
     case 'detail_evaluation':         include __DIR__.'/extra.php'; exit;
     case 'lister_utilisateurs':       include __DIR__.'/extra.php'; exit;
@@ -581,7 +587,65 @@ function mesCertificats(): void {
     repondreJSON(['succes' => true, 'certificats' => $stmt->fetchAll()]);
 }
 
-function statsEtudiant(): void {
+
+
+/* ══════════════════════════════════════════════════════════════
+   SUGGESTIONS DE MODULES (enseignant → promoteur)
+   ══════════════════════════════════════════════════════════════ */
+
+function envoyerSuggestion(): void {
+    exigerConnexion('enseignant');
+    $uid   = $_SESSION['user_id'];
+    $titre = trim($_POST['titre'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $just  = trim($_POST['justification'] ?? '');
+
+    if (!$titre) repondreJSON(['succes' => false, 'message' => 'Le titre est requis.']);
+
+    $db   = getDB();
+    $stmt = $db->prepare('INSERT INTO suggestions_modules (enseignant_id, titre, description, justification) VALUES (?,?,?,?)');
+    $stmt->execute([$uid, $titre, $desc, $just]);
+
+    repondreJSON(['succes' => true, 'message' => 'Suggestion envoyée avec succès.']);
+}
+
+function mesSuggestions(): void {
+    exigerConnexion('enseignant');
+    $uid  = $_SESSION['user_id'];
+    $db   = getDB();
+    $stmt = $db->prepare('SELECT * FROM suggestions_modules WHERE enseignant_id=? ORDER BY cree_le DESC');
+    $stmt->execute([$uid]);
+    repondreJSON(['succes' => true, 'suggestions' => $stmt->fetchAll()]);
+}
+
+function listerSuggestions(): void {
+    exigerConnexion('promoteur');
+    $db   = getDB();
+    $stmt = $db->prepare('
+        SELECT s.*, u.nom AS enseignant_nom, u.prenom AS enseignant_prenom
+        FROM suggestions_modules s
+        JOIN users u ON u.id = s.enseignant_id
+        ORDER BY FIELD(s.statut,"en_attente","acceptee","refusee"), s.cree_le DESC
+    ');
+    $stmt->execute();
+    repondreJSON(['succes' => true, 'suggestions' => $stmt->fetchAll()]);
+}
+
+function traiterSuggestion(): void {
+    exigerConnexion('promoteur');
+    $id          = (int)($_POST['id'] ?? 0);
+    $statut      = $_POST['statut'] ?? '';
+    $commentaire = trim($_POST['commentaire'] ?? '');
+
+    if (!$id || !in_array($statut, ['acceptee', 'refusee']))
+        repondreJSON(['succes' => false, 'message' => 'Paramètres invalides.']);
+
+    $db   = getDB();
+    $stmt = $db->prepare('UPDATE suggestions_modules SET statut=?, commentaire=?, traite_le=NOW() WHERE id=?');
+    $stmt->execute([$statut, $commentaire, $id]);
+
+    repondreJSON(['succes' => true, 'message' => 'Suggestion traitée.']);
+}
     exigerConnexion('etudiant');
     $uid = $_SESSION['user_id'];
     $db  = getDB();

@@ -149,6 +149,20 @@ CREATE TABLE reponses_etudiants (
     FOREIGN KEY (reponse_id)  REFERENCES reponses(id)              ON DELETE SET NULL
 );
 
+-- ── Suggestions de modules (enseignant → promoteur) ─────────────────────────
+CREATE TABLE suggestions_modules (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    enseignant_id   INT NOT NULL,
+    titre           VARCHAR(200) NOT NULL,
+    description     TEXT,
+    justification   TEXT,
+    statut          ENUM('en_attente','acceptee','refusee') NOT NULL DEFAULT 'en_attente',
+    commentaire     TEXT DEFAULT NULL,   -- réponse du promoteur
+    cree_le         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    traite_le       DATETIME DEFAULT NULL,
+    FOREIGN KEY (enseignant_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- ── Certificats ──────────────────────────────────────────────────────────────
 CREATE TABLE certificats (
     id           INT AUTO_INCREMENT PRIMARY KEY,
