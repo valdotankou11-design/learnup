@@ -1,4 +1,8 @@
 <?php
+// Désactiver l'affichage des erreurs PHP pour éviter de corrompre les réponses JSON
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(0);
 /**
  * LearnUp — config/db.php
  * Configuration de la base de données et utilitaires session
