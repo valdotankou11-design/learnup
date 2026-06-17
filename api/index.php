@@ -628,7 +628,7 @@ function listerSuggestions(): void {
         SELECT s.*, u.nom AS enseignant_nom, u.prenom AS enseignant_prenom
         FROM suggestions_modules s
         JOIN users u ON u.id = s.enseignant_id
-        ORDER BY FIELD(s.statut,"en_attente","acceptee","refusee"), s.cree_le DESC
+        ORDER BY CASE s.statut WHEN 'en_attente' THEN 1 WHEN 'acceptee' THEN 2 ELSE 3 END, s.cree_le DESC
     ');
     $stmt->execute();
     repondreJSON(['succes' => true, 'suggestions' => $stmt->fetchAll()]);
