@@ -467,8 +467,13 @@ async function sInscrire(e) {
   });
 
   if (data.succes) {
-    toast('Compte créé ! Connexion en cours...', 'succes');
-    setTimeout(() => window.location.href = '/dashboard/' + data.role + '.php', 800);
+    if (data.en_attente) {
+      toast('Demande soumise ! Redirection...', 'succes');
+      setTimeout(() => window.location.href = '/attente.php', 800);
+    } else {
+      toast('Compte créé ! Connexion en cours...', 'succes');
+      setTimeout(() => window.location.href = '/dashboard/' + data.role + '.php', 800);
+    }
   } else {
     toast(data.message || 'Erreur lors de l\'inscription.', 'erreur');
     btn.disabled = false;
