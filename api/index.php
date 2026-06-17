@@ -1,4 +1,7 @@
 <?php
+// Empêcher PHP d'injecter des warnings HTML dans les réponses JSON
+ini_set('display_errors', '0');
+error_reporting(0);
 /**
  * LearnUp — api/index.php
  * Point d'entrée unique pour toutes les requêtes Ajax
