@@ -12,10 +12,12 @@ if ($code) {
     $db   = getDB();
     $stmt = $db->prepare('
         SELECT ce.*, m.titre AS module_titre, m.description AS module_desc,
-               u.nom, u.prenom, u.email
+               u.nom, u.prenom, u.email,
+               p.nom AS promo_nom, p.prenom AS promo_prenom, p.email AS promo_email
         FROM certificats ce
-        JOIN modules m ON m.id = ce.module_id
-        JOIN users   u ON u.id = ce.etudiant_id
+        JOIN modules m ON m.id  = ce.module_id
+        JOIN users   u ON u.id  = ce.etudiant_id
+        JOIN users   p ON p.id  = m.promoteur_id
         WHERE ce.code_unique = ?
     ');
     $stmt->execute([$code]);
@@ -272,6 +274,13 @@ if ($code) {
       <?php if ($certificat['module_desc']): ?>
         <p class="cert-desc"><?= htmlspecialchars($certificat['module_desc']) ?></p>
       <?php endif; ?>
+
+      <!-- Promoteur -->
+      <div style="margin-bottom:28px;padding:16px 20px;background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:12px;position:relative;z-index:1;">
+        <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--texte3);margin-bottom:6px;">Délivré par</div>
+        <div style="font-weight:700;color:var(--blanc);font-size:0.95rem;"><?= htmlspecialchars($certificat['promo_prenom']) ?> <?= htmlspecialchars($certificat['promo_nom']) ?></div>
+        <div style="font-size:0.82rem;color:var(--violet-cl);margin-top:2px;"><?= htmlspecialchars($certificat['promo_email']) ?></div>
+      </div>
 
       <!-- Pied de page -->
       <div class="cert-footer">

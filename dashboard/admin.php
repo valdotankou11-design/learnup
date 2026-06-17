@@ -209,6 +209,7 @@ $user = utilisateurCourant();
         </div>
       </div>
 
+      <div id="admin-promoteurs-attente" style="display:none;margin-top:24px;"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:20px;" id="admin-stats-bottom"></div>
     </section>
 
@@ -407,7 +408,7 @@ $user = utilisateurCourant();
     <input type="hidden" id="modal-reset-user-id"/>
     <div class="form-group">
       <label class="form-label">Nouveau mot de passe</label>
-      <input type="password" id="modal-reset-mdp" class="form-control" placeholder="Min. 8 caractères"/>
+      <input type="password" id="input-reset-mdp" class="form-control" placeholder="Min. 8 caractères"/>
     </div>
     <div style="display:flex;gap:12px;margin-top:8px;">
       <button class="btn btn-primary" onclick="confirmerResetMdp()">✅ Réinitialiser</button>
@@ -510,6 +511,31 @@ async function chargerAccueil() {
     }).join('');
   }
 
+  // Promoteurs en attente
+  const promoData = await adminAjax('admin_promoteurs_attente');
+  const promoEl = document.getElementById('admin-promoteurs-attente');
+  if (promoData.succes && promoData.promoteurs.length > 0) {
+    promoEl.style.display = 'block';
+    promoEl.innerHTML = '<div class="card" style="margin-bottom:24px;border:1px solid rgba(255,165,0,0.3);background:rgba(255,165,0,0.05);">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:1.3rem;">⏳</span>'
+      + '<h3 style="margin:0;color:var(--orange);">Promoteurs en attente (' + promoData.promoteurs.length + ')</h3></div>'
+      + promoData.promoteurs.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-weight:600;color:var(--blanc);">${escHtml(p.prenom)} ${escHtml(p.nom)}</div>
+            <div style="font-size:0.82rem;color:var(--texte3);">${escHtml(p.email)}</div>
+            <div style="font-size:0.75rem;color:var(--texte3);">Inscrit le ${new Date(p.cree_le).toLocaleDateString('fr-FR')}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm" style="background:rgba(0,212,170,0.15);color:var(--menthe);border:1px solid rgba(0,212,170,0.3);" onclick="validerPromoteur(${p.id})">✅ Valider</button>
+            <button class="btn btn-sm" style="background:rgba(255,80,80,0.15);color:#ff5050;border:1px solid rgba(255,80,80,0.3);" onclick="rejeterPromoteur(${p.id},'${escHtml(p.prenom)} ${escHtml(p.nom)}')">❌ Rejeter</button>
+          </div>
+        </div>`).join('')
+      + '</div>';
+  } else {
+    promoEl.style.display = 'none';
+  }
+
   // Stats supplémentaires
   document.getElementById('admin-stats-bottom').innerHTML = `
     <div class="card" style="padding:18px;">
@@ -530,6 +556,20 @@ async function chargerAccueil() {
 /* ══════════════════════════════════════════════════════════════
    UTILISATEURS
    ══════════════════════════════════════════════════════════════ */
+async function validerPromoteur(id) {
+  const data = await adminAjax('admin_valider_promoteur', { user_id: id });
+  if (data.succes) { toast(data.message, 'succes'); chargerAccueil(); }
+  else toast(data.message, 'erreur');
+}
+
+async function rejeterPromoteur(id, nom) {
+  confirmer(`⚠️ Rejeter et supprimer la demande de "${nom}" ?`, async () => {
+    const data = await adminAjax('admin_rejeter_promoteur', { user_id: id });
+    if (data.succes) { toast(data.message, 'succes'); chargerAccueil(); }
+    else toast(data.message, 'erreur');
+  });
+}
+
 async function chargerUtilisateurs() {
   const search = document.getElementById('filtre-search')?.value || '';
   const role   = document.getElementById('filtre-role')?.value || '';
@@ -622,13 +662,13 @@ async function confirmerChangerRole() {
 function ouvrirResetMdp(id, nom) {
   document.getElementById('modal-reset-user-id').value = id;
   document.getElementById('modal-reset-nom').textContent = `Utilisateur : ${nom}`;
-  document.getElementById('modal-reset-mdp').value = '';
+  document.getElementById('input-reset-mdp').value = '';
   ouvrirModal('modal-reset-mdp');
 }
 
 async function confirmerResetMdp() {
   const id  = document.getElementById('modal-reset-user-id').value;
-  const mdp = document.getElementById('modal-reset-mdp').value;
+  const mdp = document.getElementById('input-reset-mdp').value;
   const data = await adminAjax('admin_reset_mdp', { user_id: id, mot_de_passe: mdp });
   if (data.succes) {
     toast(data.message, 'succes');

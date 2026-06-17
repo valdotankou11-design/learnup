@@ -64,6 +64,14 @@ function connexion(): void {
     if (!$email || !$mdp) repondreJSON(['succes' => false, 'message' => 'Champs requis.']);
 
     $db   = getDB();
+
+    // Vérifier si compte promoteur en attente de validation
+    $stmtCheck = $db->prepare('SELECT role, actif FROM users WHERE email = ?');
+    $stmtCheck->execute([$email]);
+    $check = $stmtCheck->fetch();
+    if ($check && $check['role'] === 'promoteur' && !$check['actif'])
+        repondreJSON(['succes' => false, 'message' => 'Votre compte est en attente de validation par un administrateur.']);
+
     $stmt = $db->prepare('SELECT * FROM users WHERE email = ? AND actif = 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
@@ -102,9 +110,15 @@ function inscription(): void {
     $stmt->execute([$email]);
     if ($stmt->fetch()) repondreJSON(['succes' => false, 'message' => 'Cet e-mail est déjà utilisé.']);
 
-    $hash = password_hash($mdp, PASSWORD_DEFAULT);
-    $stmt = $db->prepare('INSERT INTO users (nom,prenom,email,mot_de_passe,role) VALUES (?,?,?,?,?)');
-    $stmt->execute([$nom, $pren, $email, $hash, $role]);
+    $hash  = password_hash($mdp, PASSWORD_DEFAULT);
+    $actif = ($role === 'promoteur') ? 0 : 1;
+    $stmt  = $db->prepare('INSERT INTO users (nom,prenom,email,mot_de_passe,role,actif) VALUES (?,?,?,?,?,?)');
+    $stmt->execute([$nom, $pren, $email, $hash, $role, $actif]);
+
+    if ($role === 'promoteur') {
+        repondreJSON(['succes' => true, 'role' => 'promoteur', 'en_attente' => true,
+            'message' => 'Votre demande a été soumise. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.']);
+    }
 
     $id = $db->lastInsertId();
     $_SESSION['user_id']     = $id;

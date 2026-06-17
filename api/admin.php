@@ -14,6 +14,9 @@ switch ($action) {
     case 'admin_stats':              adminStats();              break;
     case 'admin_utilisateurs':       adminUtilisateurs();       break;
     case 'admin_activer_user':       adminActiverUser();        break;
+    case 'admin_valider_promoteur':  adminValiderPromoteur();   break;
+    case 'admin_rejeter_promoteur':  adminRejeterPromoteur();   break;
+    case 'admin_promoteurs_attente': adminPromoteursAttente();  break;
     case 'admin_changer_role':       adminChangerRole();        break;
     case 'admin_supprimer_user':     adminSupprimerUser();      break;
     case 'admin_creer_user':         adminCreerUser();          break;
@@ -117,6 +120,31 @@ function adminUtilisateurs(): void {
     $stmt->execute($params);
 
     repondreJSON(['succes' => true, 'utilisateurs' => $stmt->fetchAll()]);
+}
+
+function adminPromoteursAttente(): void {
+    exigerAdmin();
+    $db   = getDB();
+    $stmt = $db->query("SELECT id, nom, prenom, email, cree_le FROM users WHERE role = 'promoteur' AND actif = 0 ORDER BY cree_le DESC");
+    repondreJSON(['succes' => true, 'promoteurs' => $stmt->fetchAll()]);
+}
+
+function adminValiderPromoteur(): void {
+    exigerAdmin();
+    $id = (int)($_POST['user_id'] ?? 0);
+    if (!$id) repondreJSON(['succes' => false, 'message' => 'ID manquant.']);
+    $db = getDB();
+    $db->prepare("UPDATE users SET actif = 1 WHERE id = ? AND role = 'promoteur'")->execute([$id]);
+    repondreJSON(['succes' => true, 'message' => 'Compte promoteur validé.']);
+}
+
+function adminRejeterPromoteur(): void {
+    exigerAdmin();
+    $id = (int)($_POST['user_id'] ?? 0);
+    if (!$id) repondreJSON(['succes' => false, 'message' => 'ID manquant.']);
+    $db = getDB();
+    $db->prepare("DELETE FROM users WHERE id = ? AND role = 'promoteur' AND actif = 0")->execute([$id]);
+    repondreJSON(['succes' => true, 'message' => 'Demande rejetée.']);
 }
 
 function adminActiverUser(): void {
