@@ -87,7 +87,8 @@ $user = utilisateurCourant();
       <div id="liste-certifs-promoteur"></div>
     </section>
 
-    <!-- ══ UTILISATEURS ══ -->\n    <section id="section-utilisateurs" style="display:none;">
+    <!-- ══ UTILISATEURS ══ -->
+    <section id="section-utilisateurs" style="display:none;">
       <div style="margin-bottom:24px;">
         <h1>Utilisateurs</h1>
         <p>Tous les membres de la plateforme</p>
