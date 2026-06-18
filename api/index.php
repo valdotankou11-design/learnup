@@ -598,7 +598,7 @@ function mesCertificats(): void {
    ══════════════════════════════════════════════════════════════ */
 
 function supprimerSuggestion(): void {
-    $role = $_SESSION["role"] ?? $_SESSION["role_utilisateur"] ?? "";
+    $role = $_SESSION["user_role"] ?? "";
     if (!$role) repondreJSON(["succes" => false, "message" => "Non connecté."], 401);
     $uid = $_SESSION["user_id"];
     $id  = (int)($_POST["id"] ?? 0);

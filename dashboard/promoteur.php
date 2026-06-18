@@ -371,34 +371,24 @@ async function chargerSuggestions() {
         <button class="btn btn-sm btn-primary" onclick="ouvrirTraitement(${s.id},'acceptee')">✅ Accepter</button>
         <button class="btn btn-sm btn-outline" style="color:var(--rouge);border-color:var(--rouge);" onclick="ouvrirTraitement(${s.id},'refusee')">❌ Refuser</button>
       </div>` : '';
-    return `<div class="card" style="margin-bottom:16px;padding:20px;" id="sug-card-${s.id}">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="flex:1;">
-          <div style="font-weight:700;font-size:1.05rem;margin-bottom:4px;">${escHtml(s.titre)}</div>
-          <div style="font-size:0.85rem;color:var(--violet);margin-bottom:8px;">👤 ${escHtml(s.enseignant_prenom)} ${escHtml(s.enseignant_nom)}</div>
-          ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
-          ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
-          ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Votre réponse :</strong> ${escHtml(s.commentaire)}</p>` : ''}
-          ${boutons}
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
+    const croixSuppr = s.statut !== 'en_attente' ? `
+      <button onclick="document.getElementById('sug-card-${s.id}').remove()" title="Masquer" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--texte2);font-size:1.1rem;cursor:pointer;padding:2px 6px;border-radius:4px;" onmouseover="this.style.color='var(--rouge)'" onmouseout="this.style.color='var(--texte2)'">✕</button>` : '';
+    return `<div class="card" style="margin-bottom:16px;padding:20px;position:relative;" id="sug-card-${s.id}">
+      ${croixSuppr}
+      <div style="padding-right:${s.statut !== 'en_attente' ? '28px' : '0'};">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+          <div style="font-weight:700;font-size:1.05rem;">${escHtml(s.titre)}</div>
           <span class="badge badge-${couleur}">${icone} ${label}</span>
-          <div style="font-size:0.8rem;color:var(--texte2);margin-top:6px;">${formatDate(s.cree_le)}</div>
         </div>
+        <div style="font-size:0.85rem;color:var(--violet);margin-bottom:6px;">👤 ${escHtml(s.enseignant_prenom)} ${escHtml(s.enseignant_nom)}</div>
+        <div style="font-size:0.8rem;color:var(--texte2);margin-bottom:6px;">${formatDate(s.cree_le)}</div>
+        ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
+        ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
+        ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Votre réponse :</strong> ${escHtml(s.commentaire)}</p>` : ''}
+        ${boutons}
       </div>
     </div>`;
   }).join('');
-}
-
-async function supprimerSuggestionPromo(id) {
-  if (!confirm('Supprimer définitivement cette suggestion ?')) return;
-  const data = await ajax('supprimer_suggestion', { id });
-  if (data.succes) {
-    toast(data.message, 'succes');
-    chargerSuggestions();
-  } else {
-    toast(data.message || 'Erreur.', 'erreur');
-  }
 }
 
 let _sugId = null; let _sugStatut = null;

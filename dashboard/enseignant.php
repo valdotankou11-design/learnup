@@ -654,19 +654,17 @@ async function chargerMesSuggestions() {
   const badges = { en_attente: ['orange','⏳','En attente'], acceptee: ['menthe','✅','Acceptée'], refusee: ['rouge','❌','Refusée'] };
   el.innerHTML = data.suggestions.map(s => {
     const [couleur, icone, label] = badges[s.statut] || ['texte2','?','Inconnu'];
-    return `<div class="card" style="margin-bottom:16px;padding:20px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:700;font-size:1.05rem;margin-bottom:4px;">${escHtml(s.titre)}</div>
-          ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
-          ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
-          ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Réponse du promoteur :</strong> ${escHtml(s.commentaire)}</p>` : ''}
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
+    return `<div class="card" id="sug-card-${s.id}" style="margin-bottom:16px;padding:20px;position:relative;">
+      <button onclick="supprimerMaSuggestion(${s.id})" title="Supprimer" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--texte2);font-size:1.1rem;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px;" onmouseover="this.style.color='var(--rouge)'" onmouseout="this.style.color='var(--texte2)'">✕</button>
+      <div style="padding-right:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+          <div style="font-weight:700;font-size:1.05rem;">${escHtml(s.titre)}</div>
           <span class="badge badge-${couleur}">${icone} ${label}</span>
-          <div style="font-size:0.8rem;color:var(--texte2);margin-top:6px;">${formatDate(s.cree_le)}</div>
-          <button class="btn btn-sm" style="margin-top:8px;color:var(--rouge);border:1px solid var(--rouge);background:transparent;padding:4px 10px;border-radius:6px;cursor:pointer;" onclick="supprimerMaSuggestion(${s.id})">🗑 Supprimer</button>
         </div>
+        <div style="font-size:0.8rem;color:var(--texte2);margin-bottom:6px;">${formatDate(s.cree_le)}</div>
+        ${s.description ? `<p style="color:var(--texte2);margin:4px 0;">${escHtml(s.description)}</p>` : ''}
+        ${s.justification ? `<p style="color:var(--texte2);font-size:0.88rem;margin:4px 0;"><em>Justification : ${escHtml(s.justification)}</em></p>` : ''}
+        ${s.commentaire ? `<p style="margin-top:8px;padding:8px 12px;background:rgba(108,99,255,0.08);border-radius:6px;font-size:0.9rem;"><strong>Réponse du promoteur :</strong> ${escHtml(s.commentaire)}</p>` : ''}
       </div>
     </div>`;
   }).join('');
