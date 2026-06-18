@@ -626,6 +626,17 @@ async function voirEtudiants(coursId) {
   ouvrirModal('modal-gestion');
 }
 
+async function supprimerMaSuggestion(id) {
+  if (!confirm('Supprimer cette suggestion ?')) return;
+  const data = await ajax('supprimer_suggestion', { id });
+  if (data.succes) {
+    toast(data.message, 'succes');
+    chargerMesSuggestions();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
+}
+
 async function seDeconnecter() {
   await ajax('deconnexion');
   window.location.href = '/';
@@ -654,6 +665,7 @@ async function chargerMesSuggestions() {
         <div style="text-align:right;flex-shrink:0;">
           <span class="badge badge-${couleur}">${icone} ${label}</span>
           <div style="font-size:0.8rem;color:var(--texte2);margin-top:6px;">${formatDate(s.cree_le)}</div>
+          <button class="btn btn-sm" style="margin-top:8px;color:var(--rouge);border:1px solid var(--rouge);background:transparent;padding:4px 10px;border-radius:6px;cursor:pointer;" onclick="supprimerMaSuggestion(${s.id})">🗑 Supprimer</button>
         </div>
       </div>
     </div>`;

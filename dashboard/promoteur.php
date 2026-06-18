@@ -390,6 +390,17 @@ async function chargerSuggestions() {
   }).join('');
 }
 
+async function supprimerSuggestionPromo(id) {
+  if (!confirm('Supprimer définitivement cette suggestion ?')) return;
+  const data = await ajax('supprimer_suggestion', { id });
+  if (data.succes) {
+    toast(data.message, 'succes');
+    chargerSuggestions();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
+}
+
 let _sugId = null; let _sugStatut = null;
 function ouvrirTraitement(id, statut) {
   _sugId = id; _sugStatut = statut;

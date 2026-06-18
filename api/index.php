@@ -50,6 +50,7 @@ switch ($action) {
 
     // Suggestions de modules (enseignant → promoteur)
     case 'envoyer_suggestion':    envoyerSuggestion();    break;
+    case 'supprimer_suggestion':   supprimerSuggestion();  break;
     case 'mes_suggestions':       mesSuggestions();       break;
     case 'lister_suggestions':    listerSuggestions();    break;
     case 'traiter_suggestion':    traiterSuggestion();    break;
@@ -595,6 +596,28 @@ function mesCertificats(): void {
 /* ══════════════════════════════════════════════════════════════
    SUGGESTIONS DE MODULES (enseignant → promoteur)
    ══════════════════════════════════════════════════════════════ */
+
+function supprimerSuggestion(): void {
+    $role = $_SESSION["role"] ?? $_SESSION["role_utilisateur"] ?? "";
+    if (!$role) repondreJSON(["succes" => false, "message" => "Non connecté."], 401);
+    $uid = $_SESSION["user_id"];
+    $id  = (int)($_POST["id"] ?? 0);
+    if (!$id) repondreJSON(["succes" => false, "message" => "ID invalide."]);
+    $db = getDB();
+    if ($role === "promoteur") {
+        // Le promoteur peut supprimer uniquement les suggestions traitées
+        $stmt = $db->prepare("SELECT id FROM suggestions_modules WHERE id=? AND statut != 'en_attente'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) repondreJSON(["succes" => false, "message" => "Non autorisé ou suggestion en attente."]);
+    } else {
+        // L enseignant peut supprimer uniquement ses propres suggestions
+        $stmt = $db->prepare("SELECT id FROM suggestions_modules WHERE id=? AND enseignant_id=?");
+        $stmt->execute([$id, $uid]);
+        if (!$stmt->fetch()) repondreJSON(["succes" => false, "message" => "Non autorisé."]);
+    }
+    $db->prepare("DELETE FROM suggestions_modules WHERE id=?")->execute([$id]);
+    repondreJSON(["succes" => true, "message" => "Suggestion supprimée."]);
+}
 
 function envoyerSuggestion(): void {
     exigerConnexion('enseignant');
