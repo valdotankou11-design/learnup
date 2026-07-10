@@ -45,8 +45,8 @@ if ($code) {
          de son propre élément (aucune dépendance à overflow/clip-path), donc
          rien ne peut déborder de la bordure arrondie, y compris à l'impression. */
       background:
-        radial-gradient(circle 230px at 0px 0px, rgba(108,99,255,0.55) 0%, rgba(108,99,255,0.55) 38%, transparent 72%),
-        radial-gradient(circle 230px at 100% 100%, rgba(0,212,170,0.42) 0%, rgba(0,212,170,0.42) 38%, transparent 72%),
+        radial-gradient(circle 210px at 0px 0px, rgba(108,99,255,0.92) 0%, rgba(108,99,255,0.92) 45%, transparent 78%),
+        radial-gradient(circle 210px at 100% 100%, rgba(0,212,170,0.8) 0%, rgba(0,212,170,0.8) 45%, transparent 78%),
         linear-gradient(135deg, #1A1D27 0%, #0F1117 100%);
       background-repeat: no-repeat;
       border: 3px solid var(--violet);
@@ -192,8 +192,8 @@ if ($code) {
       .cert-card {
         border-color: #6C63FF;
         background:
-          radial-gradient(circle 230px at 0px 0px, rgba(108,99,255,0.55) 0%, rgba(108,99,255,0.55) 38%, transparent 72%),
-          radial-gradient(circle 230px at 100% 100%, rgba(0,212,170,0.42) 0%, rgba(0,212,170,0.42) 38%, transparent 72%),
+          radial-gradient(circle 210px at 0px 0px, rgba(108,99,255,0.92) 0%, rgba(108,99,255,0.92) 45%, transparent 78%),
+          radial-gradient(circle 210px at 100% 100%, rgba(0,212,170,0.8) 0%, rgba(0,212,170,0.8) 45%, transparent 78%),
           linear-gradient(135deg, #1A1D27 0%, #0F1117 100%) !important;
         background-repeat: no-repeat !important;
         box-shadow: none;
