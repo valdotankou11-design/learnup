@@ -329,7 +329,7 @@ async function voirCours(coursId, titre) {
   }
 
   el.innerHTML = data.lecons.map((l, i) => `
-    <div class="lecon-item ${l.terminee ? 'terminee' : ''}" onclick="ouvrirLecon(${l.id}, '${escHtml(l.titre)}', '${l.type}', '${escHtml(l.fichier)}', ${l.evaluation_id||'null'}, '${escHtml(l.evaluation_titre||'')}')">
+    <div class="lecon-item ${l.terminee ? 'terminee' : ''}" onclick="ouvrirLecon(${l.id}, '${escHtml(l.titre)}', '${l.type}', '${escHtml(l.fichier)}', ${l.evaluation_id||'null'}, '${escHtml(l.evaluation_titre||'')}', ${l.terminee ? 'true' : 'false'})">
       <div class="lecon-icone">${l.type === 'pdf' ? '📄' : '🎬'}</div>
       <div style="flex:1;">
         <div style="font-weight:600;color:var(--texte);font-size:0.9rem;">${i+1}. ${escHtml(l.titre)}</div>
@@ -344,37 +344,133 @@ async function voirCours(coursId, titre) {
 }
 
 /* ══ Ouvrir une leçon ══ */
-function ouvrirLecon(leconId, titre, type, fichier, evalId, evalTitre) {
+let leconEnCours = null; // { id, type, evalId, evalTitre, terminee }
+
+// Charge l'API YouTube IFrame une seule fois (nécessaire pour détecter la fin réelle de la vidéo)
+let ytApiPromise = null;
+function chargerYouTubeAPI() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise(resolve => {
+    const precedent = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (precedent) precedent(); resolve(); };
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  });
+  return ytApiPromise;
+}
+
+function ouvrirLecon(leconId, titre, type, fichier, evalId, evalTitre, terminee) {
   document.getElementById('modal-lecon-titre').textContent = titre;
   const el = document.getElementById('modal-lecon-contenu');
+  leconEnCours = { id: leconId, type, evalId, evalTitre, terminee: !!terminee };
 
   let contenu = '';
+  let estVideoYt = false, idYt = null;
+
   if (type === 'pdf') {
-    contenu = `<iframe src="${escHtml(fichier)}" style="width:100%;height:500px;border:none;border-radius:8px;background:#000"></iframe>`;
+    // URL absolue (le fichier peut être une URL Cloudinary ou un chemin relatif)
+    const urlAbsolue = /^https?:\/\//i.test(fichier) ? fichier : (location.origin + fichier);
+    // On passe par Google Docs Viewer : un <iframe> pointant directement sur le
+    // PDF ne s'affiche pas correctement sur mobile / quand le fichier est servi
+    // en "raw" (pas d'aperçu inline, juste un téléchargement). Le viewer Google
+    // fonctionne tant que l'URL est publique.
+    const viewerUrl = 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(urlAbsolue);
+    contenu = `
+      <iframe src="${viewerUrl}" style="width:100%;height:500px;border:none;border-radius:8px;background:#fff"></iframe>
+      <div style="text-align:center;margin-top:10px;">
+        <a href="${escHtml(urlAbsolue)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">📄 Ouvrir / télécharger le PDF</a>
+      </div>`;
   } else {
     // Vidéo (URL YouTube ou fichier)
-    const estYt = fichier.includes('youtube') || fichier.includes('youtu.be');
-    if (estYt) {
-      const id = fichier.split('v=')[1]?.split('&')[0] || fichier.split('/').pop();
-      contenu = `<iframe src="https://www.youtube.com/embed/${id}" style="width:100%;height:400px;border:none;border-radius:8px;" allowfullscreen></iframe>`;
+    estVideoYt = fichier.includes('youtube') || fichier.includes('youtu.be');
+    if (estVideoYt) {
+      idYt = fichier.split('v=')[1]?.split('&')[0] || fichier.split('/').pop();
+      contenu = `<div id="yt-player-${leconId}"></div>`;
     } else {
-      contenu = `<video controls style="width:100%;border-radius:8px;max-height:400px;"><source src="${escHtml(fichier)}"/>Votre navigateur ne supporte pas la vidéo.</video>`;
+      contenu = `<video id="video-${leconId}" controls style="width:100%;border-radius:8px;max-height:400px;"><source src="${escHtml(fichier)}"/>Votre navigateur ne supporte pas la vidéo.</video>`;
+    }
+    if (!terminee) {
+      contenu += `<p style="margin-top:8px;font-size:.9em;opacity:.8;">▶️ Regardez la vidéo jusqu'à la fin pour débloquer l'évaluation.</p>`;
     }
   }
 
+  const evalVerrouillee = (type === 'video' && !terminee);
+  let boutonEval = '';
+  if (evalId) {
+    boutonEval = evalVerrouillee
+      ? `<button class="btn btn-primary" id="btn-eval-${leconId}" disabled style="opacity:.5;cursor:not-allowed;" title="Terminez la vidéo pour débloquer l'évaluation">🔒 Terminez la vidéo pour débloquer l'évaluation</button>`
+      : `<button class="btn btn-primary" id="btn-eval-${leconId}" onclick="ouvrirEvaluation(${evalId},'${escHtml(evalTitre)}')">📝 Passer l'évaluation</button>`;
+  }
+
+  // Le bouton manuel "Marquer comme terminée" ne concerne que les PDF :
+  // pour les vidéos, la validation se fait automatiquement à la fin de la lecture.
+  const boutonManuel = (type === 'pdf')
+    ? `<button class="btn btn-menthe" onclick="terminerLecon(${leconId})">✅ Marquer comme terminée</button>`
+    : '';
+
   contenu += `
     <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;">
-      <button class="btn btn-menthe" onclick="terminerLecon(${leconId})">✅ Marquer comme terminée</button>
-      ${evalId ? `<button class="btn btn-primary" onclick="ouvrirEvaluation(${evalId},'${escHtml(evalTitre)}')">📝 Passer l'évaluation</button>` : ''}
+      ${boutonManuel}
+      ${boutonEval}
     </div>`;
 
   el.innerHTML = contenu;
   ouvrirModal('modal-lecon');
+
+  // Attacher la détection de fin de vidéo réelle
+  if (type === 'video' && !terminee) {
+    if (estVideoYt) {
+      chargerYouTubeAPI().then(() => {
+        new YT.Player('yt-player-' + leconId, {
+          videoId: idYt,
+          playerVars: { rel: 0 },
+          events: {
+            onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) leconVideoTerminee(leconId); }
+          }
+        });
+      });
+    } else {
+      const videoEl = document.getElementById('video-' + leconId);
+      if (videoEl) videoEl.addEventListener('ended', () => leconVideoTerminee(leconId));
+    }
+  } else if (type === 'video' && estVideoYt) {
+    // Vidéo déjà validée : simple lecteur embarqué, pas besoin de suivre la fin
+    chargerYouTubeAPI().then(() => {
+      new YT.Player('yt-player-' + leconId, { videoId: idYt, playerVars: { rel: 0 } });
+    });
+  }
 }
 
+// Appelé automatiquement quand la vidéo arrive réellement à sa fin
+async function leconVideoTerminee(leconId) {
+  if (leconEnCours && leconEnCours.terminee) return; // déjà fait, on évite les doubles appels
+  const data = await ajax('marquer_lecon', { lecon_id: leconId });
+  if (!data.succes) return;
+  toast('Vidéo terminée, leçon validée ✅', 'succes');
+
+  if (leconEnCours && leconEnCours.id === leconId) {
+    leconEnCours.terminee = true;
+    if (leconEnCours.evalId) {
+      const btn = document.getElementById('btn-eval-' + leconId);
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        btn.title = '';
+        btn.textContent = '📝 Passer l\'évaluation';
+        btn.onclick = () => ouvrirEvaluation(leconEnCours.evalId, leconEnCours.evalTitre);
+      }
+    }
+  }
+}
+
+// Utilisé uniquement pour les leçons PDF (pas de suivi de lecture possible)
 async function terminerLecon(leconId) {
   const data = await ajax('marquer_lecon', { lecon_id: leconId });
-  if (data.succes) toast('Leçon marquée comme terminée ✅', 'succes');
+  if (!data.succes) return;
+  toast('Leçon marquée comme terminée ✅', 'succes');
 }
 
 /* ══ Évaluation ══ */

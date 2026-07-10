@@ -189,16 +189,28 @@ if ($code) {
       flex-wrap: wrap;
     }
 
+    /* Forcer l'impression des couleurs/dégradés (sinon Chrome/Android
+       les ignore si "Graphiques d'arrière-plan" n'est pas coché) */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
     @media print {
-      body { background: white; }
+      body { background: #0F1117; }
       .cert-card {
         border-color: #6C63FF;
+        background: linear-gradient(135deg, #1A1D27 0%, #0F1117 100%) !important;
         box-shadow: none;
       }
       .cert-actions, nav { display: none !important; }
       .cert-nom {
-        -webkit-text-fill-color: #6C63FF;
-        color: #6C63FF;
+        -webkit-text-fill-color: #8B84FF;
+        background: linear-gradient(135deg, #8B84FF, #00D4AA) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        color: #8B84FF;
       }
     }
 
