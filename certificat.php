@@ -40,36 +40,21 @@ if ($code) {
     }
 
     .cert-card {
-      background: linear-gradient(135deg, #1A1D27 0%, #0F1117 100%);
+      /* Les deux cercles de coin sont peints comme calques de fond directement
+         sur la carte : un background est TOUJOURS découpé par le border-radius
+         de son propre élément (aucune dépendance à overflow/clip-path), donc
+         rien ne peut déborder de la bordure arrondie, y compris à l'impression. */
+      background:
+        radial-gradient(circle 230px at 0px 0px, rgba(108,99,255,0.55) 0%, rgba(108,99,255,0.55) 38%, transparent 72%),
+        radial-gradient(circle 230px at 100% 100%, rgba(0,212,170,0.42) 0%, rgba(0,212,170,0.42) 38%, transparent 72%),
+        linear-gradient(135deg, #1A1D27 0%, #0F1117 100%);
+      background-repeat: no-repeat;
       border: 3px solid var(--violet);
       border-radius: 24px;
       padding: 56px 60px;
       text-align: center;
       position: relative;
-      overflow: hidden;
-      /* Filet de sécurité pour l'impression : Chrome ne respecte pas toujours
-         overflow:hidden + border-radius pour clipper les pseudo-éléments
-         positionnés en absolu lors de l'export PDF, ce qui faisait déborder
-         le halo de couleur des coins hors de la bordure arrondie. */
-      clip-path: inset(0 round 24px);
       box-shadow: 0 0 60px rgba(108,99,255,0.2), 0 20px 60px rgba(0,0,0,0.6);
-    }
-
-    /* Décoration coins */
-    .cert-card::before, .cert-card::after {
-      content: '';
-      position: absolute;
-      width: 300px; height: 300px;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-    .cert-card::before {
-      background: radial-gradient(circle, rgba(108,99,255,0.22) 0%, transparent 70%);
-      top: -100px; left: -100px;
-    }
-    .cert-card::after {
-      background: radial-gradient(circle, rgba(0,212,170,0.16) 0%, transparent 70%);
-      bottom: -100px; right: -100px;
     }
 
     .cert-logo {
@@ -206,7 +191,11 @@ if ($code) {
       body { background: #0F1117; }
       .cert-card {
         border-color: #6C63FF;
-        background: linear-gradient(135deg, #1A1D27 0%, #0F1117 100%) !important;
+        background:
+          radial-gradient(circle 230px at 0px 0px, rgba(108,99,255,0.55) 0%, rgba(108,99,255,0.55) 38%, transparent 72%),
+          radial-gradient(circle 230px at 100% 100%, rgba(0,212,170,0.42) 0%, rgba(0,212,170,0.42) 38%, transparent 72%),
+          linear-gradient(135deg, #1A1D27 0%, #0F1117 100%) !important;
+        background-repeat: no-repeat !important;
         box-shadow: none;
       }
       .cert-actions, nav { display: none !important; }
