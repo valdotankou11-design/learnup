@@ -47,6 +47,11 @@ if ($code) {
       text-align: center;
       position: relative;
       overflow: hidden;
+      /* Filet de sécurité pour l'impression : Chrome ne respecte pas toujours
+         overflow:hidden + border-radius pour clipper les pseudo-éléments
+         positionnés en absolu lors de l'export PDF, ce qui faisait déborder
+         le halo de couleur des coins hors de la bordure arrondie. */
+      clip-path: inset(0 round 24px);
       box-shadow: 0 0 60px rgba(108,99,255,0.2), 0 20px 60px rgba(0,0,0,0.6);
     }
 
@@ -59,11 +64,11 @@ if ($code) {
       pointer-events: none;
     }
     .cert-card::before {
-      background: radial-gradient(circle, rgba(108,99,255,0.12) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(108,99,255,0.22) 0%, transparent 70%);
       top: -100px; left: -100px;
     }
     .cert-card::after {
-      background: radial-gradient(circle, rgba(0,212,170,0.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(0,212,170,0.16) 0%, transparent 70%);
       bottom: -100px; right: -100px;
     }
 
