@@ -117,10 +117,13 @@ function adminUtilisateurs(): void {
 
     $sql  = 'SELECT id, nom, prenom, email, role, actif, certifie, avatar, cree_le FROM users WHERE '
           . implode(' AND ', $where) . ' ORDER BY cree_le DESC';
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-
-    repondreJSON(['succes' => true, 'utilisateurs' => $stmt->fetchAll()]);
+    try {
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        repondreJSON(['succes' => true, 'utilisateurs' => $stmt->fetchAll()]);
+    } catch (\Throwable $e) {
+        repondreJSON(['succes' => false, 'message' => "Erreur base de données — la migration certifie_le a-t-elle été exécutée ?"], 500);
+    }
 }
 
 function adminToggleCertifie(): void {
