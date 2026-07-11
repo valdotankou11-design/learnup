@@ -258,7 +258,7 @@ function afficherCatalogue(liste) {
           <span class="badge badge-orange">${niveauLabel(c.niveau)}</span>
           <span class="badge" style="background:var(--surface2);color:var(--texte2)">📖 ${c.nb_lecons} leçons</span>
         </div>
-        <div style="font-size:0.8rem;color:var(--texte3);margin-bottom:14px;">👨‍🏫 ${escHtml(c.enseignant)}</div>
+        <div style="font-size:0.8rem;color:var(--texte3);margin-bottom:14px;display:flex;align-items:center;gap:4px;">👨‍🏫 ${escHtml(c.enseignant)} ${c.enseignant_certifie ? `<svg viewBox="0 0 48 48" style="width:14px;height:14px;" title="Enseignant certifié"><defs><linearGradient id="badgeCertEns${c.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#badgeCertEns${c.id})"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}</div>
         ${c.inscrit
           ? `<button class="btn btn-outline btn-full" onclick="voirCours(${c.id},'${escHtml(c.titre)}')">Continuer →</button>`
           : `<button class="btn btn-primary btn-full" onclick="sInscrire(${c.id})">S'inscrire gratuitement</button>`

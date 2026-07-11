@@ -5,6 +5,15 @@
 require_once __DIR__ . '/../config/db.php';
 exigerConnexion('enseignant');
 $user = utilisateurCourant();
+$estCertifie = false;
+try {
+    $c = getDB()->prepare('SELECT certifie FROM users WHERE id = ?');
+    $c->execute([$user['id']]);
+    $estCertifie = (bool)$c->fetchColumn();
+} catch (\Throwable $e) {
+    $estCertifie = false;
+}
+$badgeCertifieSvg = '<svg viewBox="0 0 48 48" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;" title="Compte certifié"><defs><linearGradient id="navBadgeCert" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#navBadgeCert)"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -17,7 +26,7 @@ $user = utilisateurCourant();
 <body>
 
 <nav class="navbar">
-  <div class="navbar-brand">Learn<span>Up</span> <span style="font-size:0.7rem;background:var(--violet-bg);color:var(--violet);padding:2px 8px;border-radius:6px;margin-left:6px;">Enseignant</span></div>
+  <div class="navbar-brand">Learn<span>Up</span> <span style="font-size:0.7rem;background:var(--violet-bg);color:var(--violet);padding:2px 8px;border-radius:6px;margin-left:6px;">Enseignant<?= $estCertifie ? $badgeCertifieSvg : '' ?></span></div>
   <ul class="navbar-nav">
     <li><a href="#" onclick="afficherSection('accueil')"    id="nav-accueil"   class="active">🏠 Accueil</a></li>
     <li><a href="#" onclick="afficherSection('mes-cours')"  id="nav-mes-cours">📚 Mes cours</a></li>

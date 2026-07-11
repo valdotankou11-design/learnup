@@ -6,6 +6,15 @@
 require_once __DIR__ . '/../config/db.php';
 exigerConnexion('admin');
 $user = utilisateurCourant();
+$estCertifie = false;
+try {
+    $c = getDB()->prepare('SELECT certifie FROM users WHERE id = ?');
+    $c->execute([$user['id']]);
+    $estCertifie = (bool)$c->fetchColumn();
+} catch (\Throwable $e) {
+    $estCertifie = false;
+}
+$badgeCertifieSvg = '<svg viewBox="0 0 48 48" style="width:14px;height:14px;vertical-align:middle;margin-left:4px;" title="Compte certifié"><defs><linearGradient id="navBadgeCert" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#navBadgeCert)"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -152,7 +161,7 @@ $user = utilisateurCourant();
 <body>
 
 <nav class="navbar">
-  <div class="navbar-brand">Learn<span>Up</span><span class="admin-badge">⚙️ ADMIN</span></div>
+  <div class="navbar-brand">Learn<span>Up</span><span class="admin-badge">⚙️ ADMIN<?= $estCertifie ? $badgeCertifieSvg : '' ?></span></div>
   <ul class="navbar-nav">
     <li><a href="#" onclick="afficherSection('accueil')"      id="nav-accueil"      class="active">🏠 Dashboard</a></li>
     <li><a href="#" onclick="afficherSection('utilisateurs')" id="nav-utilisateurs">👥 Utilisateurs</a></li>
@@ -571,49 +580,56 @@ async function rejeterPromoteur(id, nom) {
 }
 
 async function chargerUtilisateurs() {
-  const search = document.getElementById('filtre-search')?.value || '';
-  const role   = document.getElementById('filtre-role')?.value || '';
-  const actif  = document.getElementById('filtre-actif')?.value || '';
-
-  const data = await adminAjax('admin_utilisateurs', { search, role, actif });
   const tbody = document.getElementById('tbody-utilisateurs');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--texte3);">Chargement…</td></tr>`;
 
-  if (!data.succes) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--rouge);">Erreur de chargement.</td></tr>`;
-    return;
+  try {
+    const search = document.getElementById('filtre-search')?.value || '';
+    const role   = document.getElementById('filtre-role')?.value || '';
+    const actif  = document.getElementById('filtre-actif')?.value || '';
+
+    const data = await adminAjax('admin_utilisateurs', { search, role, actif });
+
+    if (!data.succes) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--rouge);">${escHtml(data.message || 'Erreur de chargement.')}</td></tr>`;
+      return;
+    }
+
+    const users = data.utilisateurs || [];
+    document.getElementById('users-count').textContent = `${users.length} utilisateur(s)`;
+
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--texte3);">Aucun utilisateur trouvé.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => `
+      <tr class="user-row">
+        <td style="color:var(--texte3);font-size:0.78rem;">#${u.id}</td>
+        <td><strong style="color:var(--texte)">${escHtml(u.prenom)} ${escHtml(u.nom)}</strong> ${u.certifie ? `<svg viewBox="0 0 48 48" style="width:15px;height:15px;vertical-align:middle;margin-left:2px;" title="Compte certifié"><defs><linearGradient id="badgeCert${u.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#badgeCert${u.id})"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}</td>
+        <td style="color:var(--texte3);font-size:0.82rem;">${escHtml(u.email)}</td>
+        <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+        <td><span class="actif-dot ${u.actif ? 'on' : 'off'}"></span>${u.actif ? 'Actif' : 'Désactivé'}</td>
+        <td style="font-size:0.78rem;color:var(--texte3);">${formatDate(u.cree_le)}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-icon toggle" title="${u.actif ? 'Désactiver' : 'Activer'}"
+              onclick="toggleActif(${u.id}, ${u.actif ? 0 : 1})">${u.actif ? '🔒' : '🔓'}</button>
+            <button class="btn-icon" title="${u.certifie ? 'Retirer la certification' : 'Certifier ce compte'}"
+              onclick="toggleCertifie(${u.id}, ${u.certifie ? 0 : 1})" style="color:${u.certifie ? '#00D4AA' : 'var(--texte3)'};">${u.certifie ? '✔️' : '⭕'}</button>
+            <button class="btn-icon edit"   title="Changer le rôle"
+              onclick="ouvrirChangerRole(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}', '${u.role}')">🔄</button>
+            <button class="btn-icon reset"  title="Réinitialiser le mot de passe"
+              onclick="ouvrirResetMdp(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}')">🔑</button>
+            <button class="btn-icon del"    title="Supprimer"
+              onclick="supprimerUser(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch (e) {
+    console.error('[LearnUp Admin] chargerUtilisateurs a échoué:', e);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--rouge);">Erreur JS : ${escHtml(String(e && e.message || e))}</td></tr>`;
   }
-
-  const users = data.utilisateurs;
-  document.getElementById('users-count').textContent = `${users.length} utilisateur(s)`;
-
-  if (!users.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--texte3);">Aucun utilisateur trouvé.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = users.map(u => `
-    <tr class="user-row">
-      <td style="color:var(--texte3);font-size:0.78rem;">#${u.id}</td>
-      <td><strong style="color:var(--texte)">${escHtml(u.prenom)} ${escHtml(u.nom)}</strong> ${u.certifie ? `<svg viewBox="0 0 48 48" style="width:15px;height:15px;vertical-align:middle;margin-left:2px;" title="Compte certifié"><defs><linearGradient id="badgeCert${u.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#badgeCert${u.id})"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}</td>
-      <td style="color:var(--texte3);font-size:0.82rem;">${escHtml(u.email)}</td>
-      <td><span class="role-badge role-${u.role}">${u.role}</span></td>
-      <td><span class="actif-dot ${u.actif ? 'on' : 'off'}"></span>${u.actif ? 'Actif' : 'Désactivé'}</td>
-      <td style="font-size:0.78rem;color:var(--texte3);">${formatDate(u.cree_le)}</td>
-      <td>
-        <div class="action-btns">
-          <button class="btn-icon toggle" title="${u.actif ? 'Désactiver' : 'Activer'}"
-            onclick="toggleActif(${u.id}, ${u.actif ? 0 : 1})">${u.actif ? '🔒' : '🔓'}</button>
-          <button class="btn-icon" title="${u.certifie ? 'Retirer la certification' : 'Certifier ce compte'}"
-            onclick="toggleCertifie(${u.id}, ${u.certifie ? 0 : 1})" style="color:${u.certifie ? '#00D4AA' : 'var(--texte3)'};">${u.certifie ? '✔️' : '⭕'}</button>
-          <button class="btn-icon edit"   title="Changer le rôle"
-            onclick="ouvrirChangerRole(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}', '${u.role}')">🔄</button>
-          <button class="btn-icon reset"  title="Réinitialiser le mot de passe"
-            onclick="ouvrirResetMdp(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}')">🔑</button>
-          <button class="btn-icon del"    title="Supprimer"
-            onclick="supprimerUser(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}')">🗑️</button>
-        </div>
-      </td>
-    </tr>`).join('');
 }
 
 async function creerUtilisateur() {

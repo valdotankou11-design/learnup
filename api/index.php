@@ -509,7 +509,7 @@ function coursDisponibles(): void {
     $db   = getDB();
     $uid  = $_SESSION['user_id'] ?? 0;
     $sql = "SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom,' ',u.nom) AS enseignant,
+               CONCAT(u.prenom,' ',u.nom) AS enseignant, u.certifie AS enseignant_certifie,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM inscriptions WHERE cours_id=c.id AND etudiant_id=?) AS inscrit
         FROM cours c
@@ -541,7 +541,7 @@ function mesCoursEtudiant(): void {
     exigerConnexion('etudiant');
     $db   = getDB();
     $sql2 = "SELECT c.*, m.titre AS module_titre,
-               CONCAT(u.prenom,' ',u.nom) AS enseignant,
+               CONCAT(u.prenom,' ',u.nom) AS enseignant, u.certifie AS enseignant_certifie,
                (SELECT COUNT(*) FROM lecons WHERE cours_id=c.id AND actif=1) AS nb_lecons,
                (SELECT COUNT(*) FROM progression_lecons pl
                 JOIN lecons l ON l.id=pl.lecon_id
