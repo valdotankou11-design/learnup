@@ -132,23 +132,34 @@ $user = utilisateurCourant();
   </div>
 </div>
 
-<!-- ══ MODAL : Attribuer certificat ══ -->
+<!-- ══ MODAL : Étudiants ayant terminé le module ══ -->
+<div class="modal-overlay" id="modal-etudiants-module">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 class="modal-titre" id="modal-etudiants-module-titre">Étudiants ayant terminé</h3>
+      <button class="modal-fermer" onclick="fermerModal('modal-etudiants-module')">✕</button>
+    </div>
+    <div id="liste-etudiants-module"><div class="spinner" style="margin:30px auto"></div></div>
+  </div>
+</div>
+
+<!-- ══ MODAL : Délivrer un certificat ══ -->
 <div class="modal-overlay" id="modal-certificat">
   <div class="modal" style="max-width:500px;">
     <div class="modal-header">
-      <h3 class="modal-titre">Attribuer un certificat</h3>
+      <h3 class="modal-titre">Délivrer le certificat</h3>
       <button class="modal-fermer" onclick="fermerModal('modal-certificat')">✕</button>
     </div>
     <div class="form-group">
       <label class="form-label">Module</label>
-      <select id="cert-module" class="form-control"></select>
+      <input type="text" id="cert-module-nom" class="form-control" disabled/>
     </div>
     <div class="form-group">
       <label class="form-label">Étudiant (e-mail)</label>
-      <input type="email" id="cert-etudiant-email" class="form-control" placeholder="etudiant@exemple.com"/>
+      <input type="email" id="cert-etudiant-email" class="form-control" readonly/>
     </div>
     <div style="display:flex;gap:12px;margin-top:8px;">
-      <button class="btn btn-primary" onclick="attribuerCertificat()">🏆 Attribuer</button>
+      <button class="btn btn-primary" onclick="attribuerCertificat()">✅ Délivrer</button>
       <button class="btn btn-outline" onclick="fermerModal('modal-certificat')">Annuler</button>
     </div>
   </div>
@@ -214,8 +225,20 @@ async function chargerAccueil() {
       </div>`).join('') || '<div class="empty-state"><div class="icon">📦</div><h3>Aucun module</h3></div>';
   }
 
-  document.getElementById('certificats-recents').innerHTML =
-    `<div class="alerte alerte-info">ℹ️ Attribuez des certificats dans l'onglet <strong>Certificats</strong></div>`;
+  const certifsR = await ajax('lister_certificats_promoteur');
+  const elCert = document.getElementById('certificats-recents');
+  if (certifsR.succes && certifsR.certificats?.length) {
+    elCert.innerHTML = certifsR.certificats.slice(0,5).map(c => `
+      <div class="card" style="margin-bottom:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <strong style="color:var(--texte)">${escHtml(c.prenom)} ${escHtml(c.nom)}</strong>
+          <div style="font-size:0.78rem;color:var(--texte3);margin-top:2px;">${escHtml(c.module_titre)} · ${formatDate(c.delivre_le)}</div>
+        </div>
+        <span style="font-size:1.1rem;">🏆</span>
+      </div>`).join('');
+  } else {
+    elCert.innerHTML = `<div class="alerte alerte-info">ℹ️ Attribuez des certificats dans l'onglet <strong>Certificats</strong></div>`;
+  }
 }
 
 /* ══ Modules ══ */
@@ -234,7 +257,7 @@ async function chargerModules() {
       </div>
       <p style="font-size:0.82rem;margin-bottom:16px;">${escHtml(m.description||'')}</p>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="ouvrirAttribuerCertificat(${m.id},'${escHtml(m.titre)}')">🏆 Certificat</button>
+        <button class="btn btn-outline btn-sm" onclick="voirEtudiantsModule(${m.id},'${escHtml(m.titre)}')">🏆 Certificat</button>
         <button class="btn btn-sm" style="background:rgba(255,71,87,0.1);color:var(--rouge);border:none;" onclick="supprimerModule(${m.id})">🗑️</button>
       </div>
     </div>`).join('');
@@ -263,6 +286,72 @@ async function supprimerModule(id) {
     const data = await ajax('supprimer_module', { module_id: id });
     if (data.succes) { toast('Module supprimé.', 'succes'); chargerModules(); }
   });
+}
+
+/* ══ Certificat depuis un module : liste des étudiants ayant terminé ══ */
+let moduleCertifCourant  = null; // { id, titre }
+let etudiantChoisiCourant = null; // { id, email }
+
+async function voirEtudiantsModule(moduleId, titre) {
+  moduleCertifCourant = { id: moduleId, titre };
+  document.getElementById('modal-etudiants-module-titre').textContent = `Étudiants — ${titre}`;
+  document.getElementById('liste-etudiants-module').innerHTML = '<div class="spinner" style="margin:30px auto"></div>';
+  ouvrirModal('modal-etudiants-module');
+  await rafraichirEtudiantsModule();
+}
+
+async function rafraichirEtudiantsModule() {
+  if (!moduleCertifCourant) return;
+  const data = await ajax('etudiants_termine_module', { module_id: moduleCertifCourant.id });
+  const el = document.getElementById('liste-etudiants-module');
+  if (!data.succes) {
+    el.innerHTML = `<div class="alerte alerte-erreur">${escHtml(data.message || 'Erreur.')}</div>`;
+    return;
+  }
+  if (!data.etudiants.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">🎓</div><h3>Aucun étudiant n'a encore terminé ce module</h3></div>`;
+    return;
+  }
+  el.innerHTML = data.etudiants.map(e => e.certifie ? `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.2);margin-bottom:8px;opacity:.7;">
+      <div>
+        <strong style="color:var(--texte)">${escHtml(e.prenom)} ${escHtml(e.nom)}</strong>
+        <div style="font-size:.78rem;color:var(--texte3)">${escHtml(e.email)}</div>
+      </div>
+      <span style="color:var(--menthe);font-size:1.2rem;">✅</span>
+    </div>` : `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;" onclick="choisirEtudiantPourCertificat(${e.id},'${escHtml(e.email)}')">
+      <div>
+        <strong style="color:var(--texte)">${escHtml(e.prenom)} ${escHtml(e.nom)}</strong>
+        <div style="font-size:.78rem;color:var(--texte3)">${escHtml(e.email)}</div>
+      </div>
+      <span style="color:var(--violet-cl);font-size:.85rem;">Délivrer →</span>
+    </div>`).join('');
+}
+
+function choisirEtudiantPourCertificat(etudiantId, email) {
+  etudiantChoisiCourant = { id: etudiantId, email };
+  document.getElementById('cert-module-nom').value    = moduleCertifCourant.titre;
+  document.getElementById('cert-etudiant-email').value = email;
+  fermerModal('modal-etudiants-module');
+  ouvrirModal('modal-certificat');
+}
+
+async function attribuerCertificat() {
+  if (!moduleCertifCourant || !etudiantChoisiCourant) return;
+  const data = await ajax('attribuer_certificat', {
+    etudiant_id: etudiantChoisiCourant.id,
+    module_id:   moduleCertifCourant.id,
+  });
+  if (data.succes) {
+    toast('Certificat délivré ✅', 'succes');
+    fermerModal('modal-certificat');
+    etudiantChoisiCourant = null;
+    ouvrirModal('modal-etudiants-module');
+    await rafraichirEtudiantsModule();
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+  }
 }
 
 /* ══ Certificats ══ */

@@ -14,6 +14,7 @@ switch ($action) {
     case 'admin_stats':              adminStats();              break;
     case 'admin_utilisateurs':       adminUtilisateurs();       break;
     case 'admin_activer_user':       adminActiverUser();        break;
+    case 'admin_toggle_certifie':    adminToggleCertifie();     break;
     case 'admin_valider_promoteur':  adminValiderPromoteur();   break;
     case 'admin_rejeter_promoteur':  adminRejeterPromoteur();   break;
     case 'admin_promoteurs_attente': adminPromoteursAttente();  break;
@@ -114,12 +115,25 @@ function adminUtilisateurs(): void {
         $params[] = (int)$actif;
     }
 
-    $sql  = 'SELECT id, nom, prenom, email, role, actif, avatar, cree_le FROM users WHERE '
+    $sql  = 'SELECT id, nom, prenom, email, role, actif, certifie, avatar, cree_le FROM users WHERE '
           . implode(' AND ', $where) . ' ORDER BY cree_le DESC';
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
 
     repondreJSON(['succes' => true, 'utilisateurs' => $stmt->fetchAll()]);
+}
+
+function adminToggleCertifie(): void {
+    exigerAdmin();
+    $id       = (int)($_POST['user_id']  ?? 0);
+    $certifie = (int)($_POST['certifie'] ?? 0) ? 1 : 0;
+    if (!$id) repondreJSON(['succes' => false, 'message' => 'ID manquant.']);
+
+    $db = getDB();
+    $db->prepare('UPDATE users SET certifie = ?, certifie_le = IF(? = 1, NOW(), NULL) WHERE id = ?')
+       ->execute([$certifie, $certifie, $id]);
+
+    repondreJSON(['succes' => true, 'message' => $certifie ? 'Compte certifié ✔️' : 'Certification retirée.']);
 }
 
 function adminPromoteursAttente(): void {

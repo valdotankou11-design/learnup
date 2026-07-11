@@ -594,7 +594,7 @@ async function chargerUtilisateurs() {
   tbody.innerHTML = users.map(u => `
     <tr class="user-row">
       <td style="color:var(--texte3);font-size:0.78rem;">#${u.id}</td>
-      <td><strong style="color:var(--texte)">${escHtml(u.prenom)} ${escHtml(u.nom)}</strong></td>
+      <td><strong style="color:var(--texte)">${escHtml(u.prenom)} ${escHtml(u.nom)}</strong> ${u.certifie ? `<svg viewBox="0 0 48 48" style="width:15px;height:15px;vertical-align:middle;margin-left:2px;" title="Compte certifié"><defs><linearGradient id="badgeCert${u.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#badgeCert${u.id})"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}</td>
       <td style="color:var(--texte3);font-size:0.82rem;">${escHtml(u.email)}</td>
       <td><span class="role-badge role-${u.role}">${u.role}</span></td>
       <td><span class="actif-dot ${u.actif ? 'on' : 'off'}"></span>${u.actif ? 'Actif' : 'Désactivé'}</td>
@@ -603,6 +603,8 @@ async function chargerUtilisateurs() {
         <div class="action-btns">
           <button class="btn-icon toggle" title="${u.actif ? 'Désactiver' : 'Activer'}"
             onclick="toggleActif(${u.id}, ${u.actif ? 0 : 1})">${u.actif ? '🔒' : '🔓'}</button>
+          <button class="btn-icon" title="${u.certifie ? 'Retirer la certification' : 'Certifier ce compte'}"
+            onclick="toggleCertifie(${u.id}, ${u.certifie ? 0 : 1})" style="color:${u.certifie ? '#00D4AA' : 'var(--texte3)'};">${u.certifie ? '✔️' : '⭕'}</button>
           <button class="btn-icon edit"   title="Changer le rôle"
             onclick="ouvrirChangerRole(${u.id}, '${escHtml(u.prenom)} ${escHtml(u.nom)}', '${u.role}')">🔄</button>
           <button class="btn-icon reset"  title="Réinitialiser le mot de passe"
@@ -637,6 +639,12 @@ async function creerUtilisateur() {
 
 async function toggleActif(id, actif) {
   const data = await adminAjax('admin_activer_user', { user_id: id, actif });
+  if (data.succes) { toast(data.message, 'succes'); chargerUtilisateurs(); }
+  else toast(data.message, 'erreur');
+}
+
+async function toggleCertifie(id, certifie) {
+  const data = await adminAjax('admin_toggle_certifie', { user_id: id, certifie });
   if (data.succes) { toast(data.message, 'succes'); chargerUtilisateurs(); }
   else toast(data.message, 'erreur');
 }

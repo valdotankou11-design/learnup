@@ -24,6 +24,7 @@ switch ($action) {
     case 'lister_modules':    listerModules();     break;
     case 'supprimer_module':  supprimerModule();   break;
     case 'attribuer_certificat': attribuerCertificat(); break;
+    case 'etudiants_termine_module': etudiantsTermineModule(); break;
     case 'stats_promoteur':   statsPromoteur();    break;
 
     // Enseignant
@@ -196,10 +197,94 @@ function attribuerCertificat(): void {
     try {
         $db->prepare('INSERT INTO certificats (etudiant_id,module_id,code_unique) VALUES (?,?,?)')
            ->execute([$etudiantId, $moduleId, $code]);
+
+        // Certification automatique du promoteur : dès qu'il a délivré au
+        // moins 1500 certificats au total, sur l'ensemble de ses modules.
+        $p = $db->prepare('SELECT promoteur_id FROM modules WHERE id = ?');
+        $p->execute([$moduleId]);
+        $promoteurId = $p->fetchColumn();
+        if ($promoteurId) verifierCertificationAutoPromoteur($db, (int)$promoteurId);
+
         repondreJSON(['succes' => true, 'code' => $code]);
     } catch (\Exception $e) {
         repondreJSON(['succes' => false, 'message' => 'Certificat déjà délivré.']);
     }
+}
+
+/**
+ * Certifie automatiquement le promoteur s'il a délivré au moins 1500
+ * certificats au total sur l'ensemble de ses modules.
+ */
+function verifierCertificationAutoPromoteur(\PDO $db, int $promoteurId): void {
+    $stmt = $db->prepare('SELECT COUNT(*) FROM certificats ce JOIN modules m ON m.id = ce.module_id WHERE m.promoteur_id = ?');
+    $stmt->execute([$promoteurId]);
+    $nb = (int)$stmt->fetchColumn();
+
+    if ($nb >= 1500) {
+        $db->prepare('UPDATE users SET certifie = 1, certifie_le = IFNULL(certifie_le, NOW()) WHERE id = ? AND certifie = 0')
+           ->execute([$promoteurId]);
+    }
+}
+
+function etudiantsTermineModule(): void {
+    exigerConnexion('promoteur');
+    $moduleId = (int)($_POST['module_id'] ?? 0);
+    $pid      = $_SESSION['user_id'];
+    $db       = getDB();
+
+    // Le module doit appartenir au promoteur connecté
+    $chk = $db->prepare('SELECT id FROM modules WHERE id=? AND promoteur_id=?');
+    $chk->execute([$moduleId, $pid]);
+    if (!$chk->fetch()) repondreJSON(['succes' => false, 'message' => 'Module introuvable.']);
+
+    // Nombre total de leçons dans le module (toutes leurs cours confondus)
+    $totalStmt = $db->prepare('
+        SELECT COUNT(*) FROM lecons l
+        JOIN cours co ON co.id = l.cours_id
+        WHERE co.module_id = ? AND l.actif = 1
+    ');
+    $totalStmt->execute([$moduleId]);
+    $total = (int)$totalStmt->fetchColumn();
+
+    // Pour chaque étudiant inscrit à au moins un cours du module, on compte
+    // combien de leçons (parmi les cours du module où il est inscrit) il a
+    // marquées terminées. S'il n'est pas inscrit à un des cours du module,
+    // les leçons de ce cours ne sont simplement jamais comptées, donc il ne
+    // pourra jamais atteindre "total" : il est naturellement exclu.
+    $stmt = $db->prepare('
+        SELECT u.id, u.nom, u.prenom, u.email,
+               COUNT(DISTINCT CASE WHEN pl.termine = 1 THEN pl.lecon_id END) AS faites,
+               ce.code_unique, ce.delivre_le
+        FROM users u
+        JOIN inscriptions i  ON i.etudiant_id = u.id
+        JOIN cours co        ON co.id = i.cours_id AND co.module_id = ?
+        LEFT JOIN lecons l2  ON l2.cours_id = co.id AND l2.actif = 1
+        LEFT JOIN progression_lecons pl ON pl.lecon_id = l2.id AND pl.etudiant_id = u.id
+        LEFT JOIN certificats ce ON ce.etudiant_id = u.id AND ce.module_id = ?
+        WHERE u.role = "etudiant"
+        GROUP BY u.id, u.nom, u.prenom, u.email, ce.code_unique, ce.delivre_le
+    ');
+    $stmt->execute([$moduleId, $moduleId]);
+    $rows = $stmt->fetchAll();
+
+    $etudiants = [];
+    foreach ($rows as $r) {
+        if ($total > 0 && (int)$r['faites'] >= $total) {
+            $etudiants[] = [
+                'id'          => (int)$r['id'],
+                'nom'         => $r['nom'],
+                'prenom'      => $r['prenom'],
+                'email'       => $r['email'],
+                'certifie'    => !empty($r['code_unique']),
+                'code_unique' => $r['code_unique'],
+                'delivre_le'  => $r['delivre_le'],
+            ];
+        }
+    }
+    // Les étudiants déjà certifiés descendent en bas de la liste
+    usort($etudiants, fn($a, $b) => $a['certifie'] <=> $b['certifie']);
+
+    repondreJSON(['succes' => true, 'etudiants' => $etudiants, 'total_lecons' => $total]);
 }
 
 function statsPromoteur(): void {
@@ -488,7 +573,48 @@ function marquerLecon(): void {
                   ON DUPLICATE KEY UPDATE termine=1, termine_le=NOW()')
        ->execute([$_SESSION['user_id'], $leconId]);
 
+    // Certification automatique de l'enseignant : dès qu'un de ses cours est
+    // entièrement terminé par 1000 étudiants distincts.
+    $c = $db->prepare('SELECT cours_id FROM lecons WHERE id = ?');
+    $c->execute([$leconId]);
+    $coursId = $c->fetchColumn();
+    if ($coursId) verifierCertificationAutoEnseignant($db, (int)$coursId);
+
     repondreJSON(['succes' => true]);
+}
+
+/**
+ * Certifie automatiquement l'enseignant d'un cours si au moins 1000 étudiants
+ * distincts ont terminé toutes les leçons de ce cours.
+ */
+function verifierCertificationAutoEnseignant(\PDO $db, int $coursId): void {
+    $totalStmt = $db->prepare('SELECT COUNT(*) FROM lecons WHERE cours_id = ? AND actif = 1');
+    $totalStmt->execute([$coursId]);
+    $total = (int)$totalStmt->fetchColumn();
+    if ($total < 1) return;
+
+    $stmt = $db->prepare('
+        SELECT COUNT(*) FROM (
+            SELECT pl.etudiant_id
+            FROM progression_lecons pl
+            JOIN lecons l ON l.id = pl.lecon_id
+            WHERE l.cours_id = ? AND pl.termine = 1
+            GROUP BY pl.etudiant_id
+            HAVING COUNT(*) >= ?
+        ) t
+    ');
+    $stmt->execute([$coursId, $total]);
+    $nbTermine = (int)$stmt->fetchColumn();
+
+    if ($nbTermine >= 1000) {
+        $ens = $db->prepare('SELECT enseignant_id FROM cours WHERE id = ?');
+        $ens->execute([$coursId]);
+        $enseignantId = $ens->fetchColumn();
+        if ($enseignantId) {
+            $db->prepare('UPDATE users SET certifie = 1, certifie_le = IFNULL(certifie_le, NOW()) WHERE id = ? AND certifie = 0')
+               ->execute([$enseignantId]);
+        }
+    }
 }
 
 function passerEvaluation(): void {

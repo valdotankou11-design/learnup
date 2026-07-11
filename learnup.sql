@@ -15,6 +15,8 @@ CREATE TABLE users (
     email       VARCHAR(150) NOT NULL UNIQUE,
     mot_de_passe VARCHAR(255) NOT NULL,
     role        ENUM('etudiant','enseignant','promoteur','admin') NOT NULL DEFAULT 'etudiant',
+    certifie    TINYINT(1) NOT NULL DEFAULT 0,      -- badge "compte certifié" (type réseau social)
+    certifie_le DATETIME DEFAULT NULL,
     avatar      VARCHAR(255) DEFAULT NULL,
     actif       TINYINT(1) DEFAULT 1,
     cree_le     DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -13,7 +13,7 @@ if ($code) {
     $stmt = $db->prepare('
         SELECT ce.*, m.titre AS module_titre, m.description AS module_desc,
                u.nom, u.prenom, u.email,
-               p.nom AS promo_nom, p.prenom AS promo_prenom, p.email AS promo_email
+               p.nom AS promo_nom, p.prenom AS promo_prenom, p.email AS promo_email, p.certifie AS promo_certifie
         FROM certificats ce
         JOIN modules m ON m.id  = ce.module_id
         JOIN users   u ON u.id  = ce.etudiant_id
@@ -287,7 +287,7 @@ if ($code) {
       <!-- Promoteur -->
       <div style="margin-bottom:28px;padding:16px 20px;background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:12px;position:relative;z-index:1;">
         <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--texte3);margin-bottom:6px;">Délivré par</div>
-        <div style="font-weight:700;color:var(--blanc);font-size:0.95rem;"><?= htmlspecialchars($certificat['promo_prenom']) ?> <?= htmlspecialchars($certificat['promo_nom']) ?></div>
+        <div style="font-weight:700;color:var(--blanc);font-size:0.95rem;"><?= htmlspecialchars($certificat['promo_prenom']) ?> <?= htmlspecialchars($certificat['promo_nom']) ?><?php if (!empty($certificat['promo_certifie'])): ?> <svg viewBox="0 0 48 48" style="width:16px;height:16px;vertical-align:middle;margin-left:2px;" title="Compte certifié"><defs><linearGradient id="badgeCertPromo" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs><circle cx="24" cy="24" r="18" fill="url(#badgeCertPromo)"/><path d="M15.5 24.5l5.2 5.2L33 18" fill="none" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg><?php endif; ?></div>
         <div style="font-size:0.82rem;color:var(--violet-cl);margin-top:2px;"><?= htmlspecialchars($certificat['promo_email']) ?></div>
       </div>
 
