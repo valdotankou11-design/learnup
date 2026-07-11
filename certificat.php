@@ -180,15 +180,18 @@ if ($code) {
     }
 
     /* Forcer l'impression des couleurs/dégradés (sinon Chrome/Android
-       les ignore si "Graphiques d'arrière-plan" n'est pas coché) */
-    * {
+       les ignore si "Graphiques d'arrière-plan" n'est pas coché).
+       Limité à la carte elle-même : l'appliquer à toute la page (*) forçait
+       Chrome à rastériser tout le document en image à l'impression, d'où
+       le texte flou/pixelisé. */
+    #cert-a-imprimer, #cert-a-imprimer * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
     }
 
     @media print {
-      body { background: #0F1117; }
+      body { background: #fff; }
       .cert-card {
         border-color: #6C63FF;
         background:
