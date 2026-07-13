@@ -576,22 +576,93 @@ function detailCours(): void {
 
 function marquerLecon(): void {
     exigerConnexion('etudiant');
-    $leconId = (int)($_POST['lecon_id'] ?? 0);
-    $db      = getDB();
+    $leconId    = (int)($_POST['lecon_id'] ?? 0);
+    $etudiantId = $_SESSION['user_id'];
+    $db         = getDB();
 
     $db->prepare('INSERT INTO progression_lecons (etudiant_id,lecon_id,termine,termine_le)
                   VALUES (?,?,1,NOW())
                   ON DUPLICATE KEY UPDATE termine=1, termine_le=NOW()')
-       ->execute([$_SESSION['user_id'], $leconId]);
+       ->execute([$etudiantId, $leconId]);
 
-    // Certification automatique de l'enseignant : dès qu'un de ses cours est
-    // entièrement terminé par 1000 étudiants distincts.
-    $c = $db->prepare('SELECT cours_id FROM lecons WHERE id = ?');
+    $c = $db->prepare('SELECT l.cours_id, co.module_id FROM lecons l JOIN cours co ON co.id = l.cours_id WHERE l.id = ?');
     $c->execute([$leconId]);
-    $coursId = $c->fetchColumn();
-    if ($coursId) verifierCertificationAutoEnseignant($db, (int)$coursId);
+    $ligne = $c->fetch();
+
+    if ($ligne) {
+        // Certification automatique de l'enseignant : dès qu'un de ses cours est
+        // entièrement terminé par 1000 étudiants distincts.
+        verifierCertificationAutoEnseignant($db, (int)$ligne['cours_id']);
+
+        // Délivrance automatique du certificat de module (si l'admin l'a activée)
+        verifierEtDelivrerCertificatAutoModule($db, $etudiantId, (int)$ligne['module_id']);
+    }
 
     repondreJSON(['succes' => true]);
+}
+
+/**
+ * Renvoie true si le réglage admin donné est activé. Toujours false si la
+ * table "parametres" n'existe pas encore (migration non exécutée) : on ne
+ * casse jamais le flux normal pour ça.
+ */
+function parametreActif(\PDO $db, string $cle): bool {
+    try {
+        $stmt = $db->prepare('SELECT valeur FROM parametres WHERE cle = ?');
+        $stmt->execute([$cle]);
+        return $stmt->fetchColumn() === '1';
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Si le réglage "certification_auto_module" est activé et que l'étudiant
+ * vient de terminer 100% des leçons du module, délivre automatiquement le
+ * certificat — sans passer par la validation manuelle du promoteur.
+ */
+function verifierEtDelivrerCertificatAutoModule(\PDO $db, int $etudiantId, int $moduleId): void {
+    try {
+        if (!parametreActif($db, 'certification_auto_module')) return;
+
+        // Déjà certifié pour ce module ? Rien à faire.
+        $chk = $db->prepare('SELECT id FROM certificats WHERE etudiant_id = ? AND module_id = ?');
+        $chk->execute([$etudiantId, $moduleId]);
+        if ($chk->fetch()) return;
+
+        $totalStmt = $db->prepare('
+            SELECT COUNT(*) FROM lecons l
+            JOIN cours co ON co.id = l.cours_id
+            WHERE co.module_id = ? AND l.actif = 1
+        ');
+        $totalStmt->execute([$moduleId]);
+        $total = (int)$totalStmt->fetchColumn();
+        if ($total < 1) return;
+
+        $faitsStmt = $db->prepare('
+            SELECT COUNT(DISTINCT pl.lecon_id)
+            FROM progression_lecons pl
+            JOIN lecons l ON l.id = pl.lecon_id
+            JOIN cours co ON co.id = l.cours_id
+            WHERE co.module_id = ? AND pl.etudiant_id = ? AND pl.termine = 1
+        ');
+        $faitsStmt->execute([$moduleId, $etudiantId]);
+        $faits = (int)$faitsStmt->fetchColumn();
+
+        if ($faits >= $total) {
+            $code = genererCode(32);
+            $db->prepare('INSERT INTO certificats (etudiant_id,module_id,code_unique) VALUES (?,?,?)')
+               ->execute([$etudiantId, $moduleId, $code]);
+
+            // Le promoteur peut lui-même franchir son propre seuil de certification auto (1500)
+            $p = $db->prepare('SELECT promoteur_id FROM modules WHERE id = ?');
+            $p->execute([$moduleId]);
+            $promoteurId = $p->fetchColumn();
+            if ($promoteurId) verifierCertificationAutoPromoteur($db, (int)$promoteurId);
+        }
+    } catch (\Throwable $e) {
+        // Ne doit jamais faire échouer la validation de la leçon.
+    }
 }
 
 /**

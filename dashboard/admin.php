@@ -38,6 +38,20 @@ $badgeCertifieSvg = '<svg viewBox="0 0 48 48" style="width:14px;height:14px;vert
     .stat-card.danger .stat-icon { background: rgba(255,71,87,0.12); }
     .stat-card.danger .valeur    { color: var(--rouge); }
 
+    /* Toggle switch */
+    .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--border); border-radius: 999px; transition: .2s;
+    }
+    .switch .slider::before {
+      content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+      background: var(--texte); border-radius: 50%; transition: .2s;
+    }
+    .switch input:checked + .slider { background: linear-gradient(135deg, var(--violet), var(--menthe)); }
+    .switch input:checked + .slider::before { transform: translateX(20px); background: #fff; }
+
     .user-row td { vertical-align: middle; }
     .user-row:hover { background: rgba(108,99,255,0.04); }
 
@@ -310,6 +324,18 @@ $badgeCertifieSvg = '<svg viewBox="0 0 48 48" style="width:14px;height:14px;vert
           <h1>Certificats délivrés</h1>
           <p>Historique complet des certifications</p>
         </div>
+      </div>
+      <div class="card" style="margin-bottom:20px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <strong style="color:var(--texte);">🤖 Certification automatique des modules</strong>
+          <div style="font-size:0.8rem;color:var(--texte3);margin-top:4px;">
+            Si activé, le certificat est délivré automatiquement dès qu'un étudiant termine 100% d'un module — sans validation manuelle du promoteur.
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-cert-auto" onchange="toggleCertificationAuto(this.checked)"/>
+          <span class="slider"></span>
+        </label>
       </div>
       <div class="table-wrapper">
         <table>
@@ -786,7 +812,14 @@ async function reactiverCours(id) {
    CERTIFICATS
    ══════════════════════════════════════════════════════════════ */
 async function chargerCertificats() {
-  const data = await adminAjax('admin_certificats');
+  const [data, params] = await Promise.all([
+    adminAjax('admin_certificats'),
+    adminAjax('admin_parametres'),
+  ]);
+
+  const toggle = document.getElementById('toggle-cert-auto');
+  if (toggle && params.succes) toggle.checked = !!params.certification_auto_module;
+
   const tbody = document.getElementById('tbody-certificats');
   if (!data.succes || !data.certificats.length) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--texte3);">Aucun certificat délivré.</td></tr>`;
@@ -806,6 +839,18 @@ async function chargerCertificats() {
         <button class="btn-icon del" title="Révoquer" onclick="supprimerCertificat(${c.id})">🗑️</button>
       </td>
     </tr>`).join('');
+}
+
+async function toggleCertificationAuto(actif) {
+  const data = await adminAjax('admin_toggle_parametre', { cle: 'certification_auto_module', actif: actif ? 1 : 0 });
+  if (data.succes) {
+    toast(data.message, 'succes');
+  } else {
+    toast(data.message || 'Erreur.', 'erreur');
+    // Remet le switch dans son état précédent en cas d'échec
+    const toggle = document.getElementById('toggle-cert-auto');
+    if (toggle) toggle.checked = !actif;
+  }
 }
 
 async function supprimerCertificat(id) {

@@ -24,6 +24,8 @@ switch ($action) {
     case 'admin_modules':            adminModules();            break;
     case 'admin_cours':              adminCours();              break;
     case 'admin_certificats':        adminCertificats();        break;
+    case 'admin_parametres':         adminParametres();         break;
+    case 'admin_toggle_parametre':   adminToggleParametre();    break;
     case 'admin_supprimer_module':   adminSupprimerModule();    break;
     case 'admin_supprimer_cours':    adminSupprimerCours();     break;
     case 'admin_reactiver_cours':     adminReactiverCours();     break;
@@ -344,6 +346,44 @@ function adminCertificats(): void {
         ORDER BY ce.delivre_le DESC
     ");
     repondreJSON(['succes' => true, 'certificats' => $stmt->fetchAll()]);
+}
+
+function adminParametres(): void {
+    exigerAdmin();
+    $db = getDB();
+    $params = [];
+    try {
+        $stmt = $db->query('SELECT cle, valeur FROM parametres');
+        foreach ($stmt->fetchAll() as $r) $params[$r['cle']] = $r['valeur'];
+    } catch (\Throwable $e) {
+        // Table pas encore créée : on renvoie les valeurs par défaut (tout désactivé)
+    }
+    repondreJSON([
+        'succes' => true,
+        'certification_auto_module' => ($params['certification_auto_module'] ?? '0') === '1',
+    ]);
+}
+
+function adminToggleParametre(): void {
+    exigerAdmin();
+    $cle   = trim($_POST['cle'] ?? '');
+    $actif = ((int)($_POST['actif'] ?? 0)) ? '1' : '0';
+
+    $clesAutorisees = ['certification_auto_module'];
+    if (!in_array($cle, $clesAutorisees, true))
+        repondreJSON(['succes' => false, 'message' => 'Paramètre inconnu.']);
+
+    try {
+        $db = getDB();
+        $db->prepare('INSERT INTO parametres (cle, valeur) VALUES (?, ?) ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)')
+           ->execute([$cle, $actif]);
+        repondreJSON([
+            'succes'  => true,
+            'message' => $actif === '1' ? 'Certification automatique activée ✅' : 'Certification automatique désactivée.',
+        ]);
+    } catch (\Throwable $e) {
+        repondreJSON(['succes' => false, 'message' => 'Erreur : la table "parametres" existe-t-elle ? Exécutez install_parametres.php.'], 500);
+    }
 }
 
 function adminSupprimerCertificat(): void {
