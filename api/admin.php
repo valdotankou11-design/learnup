@@ -377,13 +377,83 @@ function adminToggleParametre(): void {
         $db = getDB();
         $db->prepare('INSERT INTO parametres (cle, valeur) VALUES (?, ?) ON DUPLICATE KEY UPDATE valeur = VALUES(valeur)')
            ->execute([$cle, $actif]);
-        repondreJSON([
-            'succes'  => true,
-            'message' => $actif === '1' ? 'Certification automatique activée ✅' : 'Certification automatique désactivée.',
-        ]);
+
+        $message = $actif === '1' ? 'Certification automatique activée ✅' : 'Certification automatique désactivée.';
+
+        // À l'activation, on rattrape aussi les étudiants qui avaient déjà
+        // terminé un module AVANT que le réglage n'existe : sans ça, seuls
+        // les futurs achèvements de leçon déclenchaient la vérification.
+        if ($cle === 'certification_auto_module' && $actif === '1') {
+            $nbDelivres = backfillCertificatsAutoModule($db);
+            if ($nbDelivres > 0) {
+                $message .= " — {$nbDelivres} certificat(s) délivré(s) rétroactivement";
+            }
+        }
+
+        repondreJSON(['succes' => true, 'message' => $message]);
     } catch (\Throwable $e) {
         repondreJSON(['succes' => false, 'message' => 'Erreur : la table "parametres" existe-t-elle ? Exécutez install_parametres.php.'], 500);
     }
+}
+
+/**
+ * Parcourt tous les modules et délivre le certificat à tout étudiant ayant
+ * déjà terminé 100% des leçons et n'en ayant pas encore un. Utilisé pour
+ * rattraper les étudiants déjà terminés au moment où l'admin active le
+ * réglage de certification automatique.
+ */
+function backfillCertificatsAutoModule(\PDO $db): int {
+    $delivres = 0;
+    $modules  = $db->query('SELECT id, promoteur_id FROM modules WHERE actif = 1')->fetchAll();
+
+    foreach ($modules as $m) {
+        $moduleId = (int)$m['id'];
+
+        $totalStmt = $db->prepare('
+            SELECT COUNT(*) FROM lecons l
+            JOIN cours co ON co.id = l.cours_id
+            WHERE co.module_id = ? AND l.actif = 1
+        ');
+        $totalStmt->execute([$moduleId]);
+        $total = (int)$totalStmt->fetchColumn();
+        if ($total < 1) continue;
+
+        $stmt = $db->prepare("
+            SELECT u.id
+            FROM users u
+            JOIN inscriptions i     ON i.etudiant_id = u.id
+            JOIN cours co           ON co.id = i.cours_id AND co.module_id = ?
+            LEFT JOIN lecons l2     ON l2.cours_id = co.id AND l2.actif = 1
+            LEFT JOIN progression_lecons pl ON pl.lecon_id = l2.id AND pl.etudiant_id = u.id
+            LEFT JOIN certificats ce ON ce.etudiant_id = u.id AND ce.module_id = ?
+            WHERE u.role = 'etudiant' AND ce.id IS NULL
+            GROUP BY u.id
+            HAVING COUNT(DISTINCT CASE WHEN pl.termine = 1 THEN pl.lecon_id END) >= ?
+        ");
+        $stmt->execute([$moduleId, $moduleId, $total]);
+        $etudiants = $stmt->fetchAll();
+
+        foreach ($etudiants as $e) {
+            try {
+                $db->prepare('INSERT INTO certificats (etudiant_id,module_id,code_unique) VALUES (?,?,?)')
+                   ->execute([$e['id'], $moduleId, genererCode(32)]);
+                $delivres++;
+            } catch (\Throwable $ex) {
+                // Certificat déjà délivré entre-temps : on ignore et on continue
+            }
+        }
+
+        if ($delivres > 0 && $m['promoteur_id']) {
+            $nb = $db->prepare('SELECT COUNT(*) FROM certificats ce2 JOIN modules m2 ON m2.id = ce2.module_id WHERE m2.promoteur_id = ?');
+            $nb->execute([$m['promoteur_id']]);
+            if ((int)$nb->fetchColumn() >= 1500) {
+                $db->prepare('UPDATE users SET certifie = 1, certifie_le = IFNULL(certifie_le, NOW()) WHERE id = ? AND certifie = 0')
+                   ->execute([$m['promoteur_id']]);
+            }
+        }
+    }
+
+    return $delivres;
 }
 
 function adminSupprimerCertificat(): void {
